@@ -6,6 +6,8 @@ import wave
 import os
 import subprocess
 import json
+import shutil
+import logging
 import requests
 from typing import Any
 
@@ -78,6 +80,11 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
         title = res.get("title") or res.get("song") or None
         artist = res.get("artist") or None
         album = res.get("album") or None
+
+        # Normalize to strings
+        title = title or ""
+        artist = artist or ""
+        album = album or ""
         image = res.get("album_cover") or res.get("spotify") and res.get("spotify").get("album") and res.get("spotify").get("album").get("images") and res.get("spotify").get("album").get("images")[0].get("url")
 
         return {
@@ -104,6 +111,7 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
     Returns a dict with keys similar to `match_audio`.
     """
     if not config.acoustid_api_key:
+        logging.debug("AcoustID API key not configured")
         return {"status": "no_token"}
 
     # write clip to temp file
@@ -112,10 +120,22 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
     try:
         _write_clip_to_wav(clip, Path(tmp.name))
 
+        # locate fpcalc: prefer explicit path, otherwise look on PATH
+        fpcalc_exe = None
+        if config.fpcalc_path:
+            fpcalc_exe = config.fpcalc_path
+        else:
+            fpcalc_exe = shutil.which("fpcalc")
+
+        if not fpcalc_exe:
+            logging.error("fpcalc not found; install Chromaprint or set FP_CALC_PATH in .env")
+            return {"status": "error", "error": "fpcalc not found; install Chromaprint or set FP_CALC_PATH in .env"}
+
         # call fpcalc to get fingerprint and duration
-        fpcalc_cmd = [config.fpcalc_path or "fpcalc", str(tmp.name)]
+        fpcalc_cmd = [fpcalc_exe, str(tmp.name)]
         proc = subprocess.run(fpcalc_cmd, capture_output=True, text=True, timeout=timeout)
         if proc.returncode != 0:
+            logging.error("fpcalc failed: %s", proc.stderr.strip())
             raise RuntimeError(f"fpcalc failed: {proc.stderr.strip()}")
 
         fingerprint = None
@@ -137,6 +157,7 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
                 pass
 
         if not fingerprint or not duration:
+            logging.error("Could not obtain fingerprint from fpcalc")
             return {"status": "error", "error": "Could not obtain fingerprint from fpcalc"}
 
         params = {
@@ -149,11 +170,13 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
 
         resp = requests.get(ACOUSTID_ENDPOINT, params=params, timeout=timeout)
         if resp.status_code != 200:
+            logging.error("AcoustID HTTP error: %s", resp.status_code)
             return {"status": "error", "error": f"HTTP {resp.status_code}"}
 
         body = resp.json()
         results = body.get("results") or []
         if not results:
+            logging.info("AcoustID returned no match")
             return {"status": "no_match", "result": None}
 
         # pick best result
@@ -171,7 +194,12 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
             # AcoustID doesn't always provide album info; try releasegroups
             if rec.get("releasegroups"):
                 album = rec.get("releasegroups")[0].get("title")
+        # Normalise return values: ensure strings not None
+        title = title or ""
+        artist = artist or ""
+        album = album or ""
 
+        logging.info("AcoustID matched: %s - %s", artist, title)
         return {
             "status": "matched",
             "result": best,
