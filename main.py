@@ -3,6 +3,8 @@ from __future__ import annotations
 from config import load_config, missing_configuration
 from fft_analyze import analyze_audio
 from recorder import load_audio_file, record_microphone
+from matcher import match_audio
+from display import show_result
 
 
 def main() -> int:
@@ -47,7 +49,15 @@ def main() -> int:
         return 1
 
     print(f"FFT analysis saved to {fft_output}")
-    print("Audio input and FFT analysis are ready for the next phase: AudD matching.")
+    print("Audio input and FFT analysis are ready for the next phase: matching.")
+
+    try:
+        result = match_audio(clip, config)
+    except Exception as exc:
+        print(f"Matching error: {exc}")
+        return 1
+
+    show_result(result)
     return 0
 
 
