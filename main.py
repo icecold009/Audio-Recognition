@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 
 from config import load_config, missing_configuration
+from recorder import load_audio_file, record_microphone
 
 
 def main() -> int:
@@ -16,14 +17,31 @@ def main() -> int:
         for name in missing:
             print(f"- {name}")
         print()
-        print("Create a .env file in the repo root and add:")
-        print("AUDD_API_TOKEN=your_token_here")
-        print("\nThe application will stop here until the token is configured.")
-        return 1
+        print("The app can still record and load audio now.")
+        print("Recognition will stay disabled until the token is added later.")
 
     print("Configuration loaded successfully.")
-    print("Phase 1 foundation is ready: environment loading and startup validation are in place.")
-    print("Next steps are audio input, FFT analysis, and AudD matching.")
+
+    mode = input("Listen via microphone or load a file? (mic/file): ").strip().lower()
+
+    try:
+        if mode == "mic":
+            duration = input("Recording length in seconds [8]: ").strip()
+            duration_seconds = int(duration) if duration else 8
+            clip = record_microphone(duration_seconds=duration_seconds)
+            print(f"Captured {len(clip.samples)} samples at {clip.sample_rate} Hz from microphone.")
+        elif mode == "file":
+            file_path = input("Enter a WAV file path: ").strip().strip('"')
+            clip = load_audio_file(file_path)
+            print(f"Loaded {clip.path} with {len(clip.samples)} samples at {clip.sample_rate} Hz.")
+        else:
+            print("Invalid choice. Use 'mic' or 'file'.")
+            return 1
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        print(f"Audio input error: {exc}")
+        return 1
+
+    print("Audio input is ready for the next phase: FFT analysis.")
     return 0
 
 
