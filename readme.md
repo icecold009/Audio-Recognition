@@ -95,19 +95,37 @@ pip install -r requirements.txt
 - You get **100 recognitions/day** on the free tier
 - Copy your API token
 
+### 3b. (Optional) Use AcoustID + fpcalc instead of AudD
+
+- If you prefer an open alternative, you can use AcoustID (requires the local `fpcalc`/Chromaprint binary).
+- Install Chromaprint / `fpcalc` for your platform (Windows/macOS/Linux). On many systems it is provided by the `chromaprint` package or a standalone installer. Ensure `fpcalc` is available on your PATH or set `FP_CALC_PATH` in your `.env`.
+- Get an AcoustID API key at https://acoustid.org/ and copy the key.
+
 ### 4. Create a `.env` file
 
 ```env
 AUDD_API_TOKEN=your_token_here
+
+# Optional: AcoustID key (when set, the app will prefer AcoustID/fpcalc)
+ACOUSTID_API_KEY=
+
+# Optional: full path to fpcalc if it's not on your PATH
+FP_CALC_PATH=
 ```
 
 > ⚠️ Never push your `.env` file to GitHub. It's already in `.gitignore`.
+
+Tip: A committed `.env.example` is included showing these variables — copy it to `.env` and fill in your keys.
 
 ### 5. Run the app
 
 ```bash
 python main.py
 ```
+
+Behavior notes:
+- If `ACOUSTID_API_KEY` is set and `fpcalc` is available, the app will use AcoustID (local fingerprinting) and fall back to AudD if AcoustID fails.
+- If neither service is configured, recognition is disabled but recording and FFT analysis still work.
 
 ---
 
