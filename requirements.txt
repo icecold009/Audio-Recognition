@@ -4,3 +4,4 @@ matplotlib
 sounddevice
 requests
 Pillow
+pyacoustid
