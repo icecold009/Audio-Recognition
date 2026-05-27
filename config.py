@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 
 
 @dataclass(frozen=True)
@@ -14,26 +15,12 @@ class AppConfig:
     fft_output_path: Path = Path("fft_output.png")
 
 
-def _load_env_file(env_path: str | Path) -> None:
-    path = Path(env_path)
-    if not path.exists():
-        return
-
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
 def load_config(env_path: str | Path = ".env") -> AppConfig:
-    _load_env_file(env_path)
+    # Use python-dotenv to load environment file if present
+    path = Path(env_path)
+    if path.exists():
+        load_dotenv(dotenv_path=str(path))
+
     return AppConfig(
         audd_api_token=os.getenv("AUDD_API_TOKEN", "").strip(),
         acoustid_api_key=os.getenv("ACOUSTID_API_KEY", "").strip(),

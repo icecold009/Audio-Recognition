@@ -4,6 +4,7 @@ matplotlib
 sounddevice
 soundfile
 requests
-python-dotenv
 Pillow
-pyacoustid
+Flask
+werkzeug
+python-dotenv

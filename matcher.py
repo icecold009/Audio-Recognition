@@ -77,15 +77,27 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
         if not res:
             return {"status": "no_match", "result": None}
 
-        title = res.get("title") or res.get("song") or None
-        artist = res.get("artist") or None
-        album = res.get("album") or None
+        title = res.get("title") or res.get("song") or ""
+        artist = res.get("artist") or ""
+        album = res.get("album") or ""
 
-        # Normalize to strings
-        title = title or ""
-        artist = artist or ""
-        album = album or ""
-        image = res.get("album_cover") or res.get("spotify") and res.get("spotify").get("album") and res.get("spotify").get("album").get("images") and res.get("spotify").get("album").get("images")[0].get("url")
+        # Extract album art from common AudD/Spotify response shapes
+        def _extract_image(body: dict) -> str | None:
+            img = body.get("album_cover")
+            if img:
+                return img
+            spotify = body.get("spotify") or {}
+            if isinstance(spotify, dict):
+                album_obj = spotify.get("album")
+                if isinstance(album_obj, dict):
+                    images = album_obj.get("images") or []
+                    if images and isinstance(images, list):
+                        first = images[0]
+                        if isinstance(first, dict):
+                            return first.get("url")
+            return None
+
+        image = _extract_image(res)
 
         return {
             "status": "matched",
