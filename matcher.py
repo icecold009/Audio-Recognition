@@ -24,7 +24,6 @@ ACOUSTID_ENDPOINT = "https://api.acoustid.org/v2/lookup"
 def _write_clip_to_wav(clip: AudioClip, path: Path) -> None:
     """Write a float32 mono AudioClip to a 16-bit PCM WAV file."""
     samples = np.asarray(clip.samples, dtype=np.float32)
-    # clip into [-1.0, 1.0]
     samples = np.clip(samples, -1.0, 1.0)
     int16 = (samples * 32767.0).astype(np.int16)
 
@@ -36,20 +35,18 @@ def _write_clip_to_wav(clip: AudioClip, path: Path) -> None:
 
 
 def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
-    """Send audio to AudD and return a normalized result dict.
+    # Try Shazam (RapidAPI) first — most accurate
+    if config.rapidapi_key:
+        try:
+            return match_audio_shazam(clip, config, timeout=timeout)
+        except Exception:
+            pass
 
-    Returns a dict with keys:
-    - status: 'no_token', 'error', 'no_match', 'matched'
-    - error: optional error message
-    - result: raw API result when matched
-    - title, artist, album, image: when available
-    """
-    # Prefer AcoustID if configured (uses local `fpcalc` to fingerprint)
+    # Fall back to AcoustID
     if config.acoustid_api_key:
         try:
             return match_audio_acoustid(clip, config, timeout=timeout)
         except Exception:
-            # fall back to AudD on any failure
             pass
 
     if not config.audd_api_token:
@@ -72,7 +69,6 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
             return {"status": "error", "error": f"HTTP {resp.status_code}"}
 
         body = resp.json()
-        # AudD returns 'result' key; if None, no match
         res = body.get("result")
         if not res:
             return {"status": "no_match", "result": None}
@@ -81,7 +77,6 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
         artist = res.get("artist") or ""
         album = res.get("album") or ""
 
-        # Extract album art from common AudD/Spotify response shapes
         def _extract_image(body: dict) -> str | None:
             img = body.get("album_cover")
             if img:
@@ -118,21 +113,16 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
 
 
 def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
-    """Fingerprint audio with `fpcalc` and query AcoustID.
-
-    Returns a dict with keys similar to `match_audio`.
-    """
+    """Fingerprint audio with `fpcalc` and query AcoustID."""
     if not config.acoustid_api_key:
         logging.debug("AcoustID API key not configured")
         return {"status": "no_token"}
 
-    # write clip to temp file
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
     tmp.close()
     try:
         _write_clip_to_wav(clip, Path(tmp.name))
 
-        # locate fpcalc: prefer explicit path, otherwise look on PATH
         fpcalc_exe = None
         if config.fpcalc_path:
             fpcalc_exe = config.fpcalc_path
@@ -143,7 +133,6 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
             logging.error("fpcalc not found; install Chromaprint or set FP_CALC_PATH in .env")
             return {"status": "error", "error": "fpcalc not found; install Chromaprint or set FP_CALC_PATH in .env"}
 
-        # call fpcalc to get fingerprint and duration
         fpcalc_cmd = [fpcalc_exe, str(tmp.name)]
         proc = subprocess.run(fpcalc_cmd, capture_output=True, text=True, timeout=timeout)
         if proc.returncode != 0:
@@ -152,7 +141,6 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
 
         fingerprint = None
         duration = None
-        # parse lines like 'FINGERPRINT=...' and 'DURATION=...'
         for line in proc.stdout.splitlines():
             if line.startswith("FINGERPRINT="):
                 fingerprint = line.split("=", 1)[1].strip()
@@ -160,7 +148,6 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
                 duration = line.split("=", 1)[1].strip()
 
         if not fingerprint or not duration:
-            # try parsing as JSON output (some fpcalc versions support -json)
             try:
                 data = json.loads(proc.stdout)
                 fingerprint = fingerprint or data.get("fingerprint")
@@ -191,9 +178,7 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
             logging.info("AcoustID returned no match")
             return {"status": "no_match", "result": None}
 
-        # pick best result
         best = results[0]
-        recordings = []
         title = None
         artist = None
         album = None
@@ -203,10 +188,9 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
             title = rec.get("title")
             if rec.get("artists"):
                 artist = ", ".join(a.get("name") for a in rec.get("artists") if a.get("name"))
-            # AcoustID doesn't always provide album info; try releasegroups
             if rec.get("releasegroups"):
                 album = rec.get("releasegroups")[0].get("title")
-        # Normalise return values: ensure strings not None
+
         title = title or ""
         artist = artist or ""
         album = album or ""
@@ -219,6 +203,71 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
             "artist": artist,
             "album": album,
             "image": None,
+        }
+
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except Exception:
+            pass
+
+
+def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
+    """Fingerprint audio using RapidAPI Shazam endpoint."""
+    if not config.rapidapi_key:
+        return {"status": "no_token"}
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+    tmp.close()
+    try:
+        _write_clip_to_wav(clip, Path(tmp.name))
+
+        with open(tmp.name, "rb") as f:
+            audio_data = f.read()
+
+        headers = {
+            "content-type": "text/plain",
+            "X-RapidAPI-Key": config.rapidapi_key,
+            "X-RapidAPI-Host": "shazam.p.rapidapi.com"
+        }
+
+        resp = requests.post(
+            "https://shazam.p.rapidapi.com/songs/detect",
+            headers=headers,
+            data=audio_data,
+            timeout=timeout
+        )
+
+        if resp.status_code != 200:
+            return {"status": "error", "error": f"HTTP {resp.status_code}"}
+
+        body = resp.json()
+
+        track = body.get("track")
+        if not track:
+            return {"status": "no_match", "result": None}
+
+        title = track.get("title", "")
+        artist = track.get("subtitle", "")
+        album = ""
+        image = track.get("images", {}).get("coverarthq") or track.get("images", {}).get("coverart")
+
+        sections = track.get("sections", [])
+        for section in sections:
+            if section.get("type") == "SONG":
+                for meta in section.get("metadata", []):
+                    if meta.get("title") == "Album":
+                        album = meta.get("text", "")
+
+        return {
+            "status": "matched",
+            "result": track,
+            "title": title,
+            "artist": artist,
+            "album": album,
+            "image": image,
         }
 
     except Exception as exc:
