@@ -1,166 +1,167 @@
-# 🎵 DIY Shazam
+<div align="center">
 
-> Identify any song from your **microphone** or an **audio file** — powered by FFT analysis and the AudD API.
+<br/>
 
-![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)
-![API](https://img.shields.io/badge/AudD-Free_Tier-f59e0b?style=flat-square)
-![Status](https://img.shields.io/badge/Status-Active-22c55e?style=flat-square)
+**Identify any song from your microphone or an audio file.**  
+FFT analysis · Multi-backend matching · Flask web UI · Terminal output
 
+
+</div>
+
+***
+<div align="center">
+  <h1 style="margin:0;padding:0">DIY Shazam</h1>
+  <p style="margin:4px 0 8px;color:#1E90FF">Identify songs from your microphone or an audio file — FFT + multi-backend matching</p>
+</div>
 ---
 
-## 📌 What Is This?
+## Overview
+DIY Shazam captures audio (mic or file), creates a frequency spectrum (FFT), and identifies tracks using one of several backends (RapidAPI/Shazam, AcoustID, AudD). A compact Flask web UI enables browser uploads.
 
-DIY Shazam is a lightweight Python app that:
-
-1. Records audio from your **microphone** or loads an **audio file**
-2. Runs **FFT (Fast Fourier Transform)** analysis and plots the frequency spectrum
-3. Sends the clip to the **AudD API** for song recognition
-4. Displays the **song title, artist**, and **album art** in your terminal
-
-Built as a learning project to understand how music recognition works under the hood.
-
----
-
-## 🧠 How It Works
-
+## Architecture
+```mermaid
+flowchart LR
+  A[CLI / Web UI] --> B[Audio Input\n(mic or upload)]
+  B --> C[FFT Analysis\n(saves fft_output.png)]
+  B --> D[Write WAV temp]
+  D --> E{Matcher Backends}
+  E -->|RapidAPI| F[Shazam]
+  E -->|AcoustID| G[AcoustID]
+  E -->|AudD| H[AudD]
+  F & G & H --> I[Normalized Result]
+  I --> J[Display (CLI) / JSON (Web)]
+  classDef blue fill:#ffffff,stroke:#1E90FF,stroke-width:2px,color:#1E90FF;
+  class A,B,C,D,E,F,G,H,I,J blue;
 ```
-Run main.py
-    │
-    ▼
-Choose: 🎤 Microphone  OR  📁 Audio File
-    │
-    ▼
-Capture 8-second WAV clip
-    │
-    ▼
-FFT Analysis → frequency spectrum saved as fft_output.png
-    │
-    ▼
-POST audio to AudD API
-    │
-    ▼
-🎵 Song name · Artist · Album art displayed in terminal
+Theme: black / white / blue — white nodes with a professional DodgerBlue accent (#1E90FF).
+
+## Quickstart
+1) Create & activate a venv:
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
-
----
-
-## 🛠 Tech Stack
-
-| Layer | Tool |
-|---|---|
-| Language | Python 3.10+ |
-| Mic Recording | `sounddevice` |
-| FFT Analysis | `scipy.fft` + `numpy` |
-| FFT Visualisation | `matplotlib` |
-| Song Matching | AudD API (free tier) |
-| Image Display | `Pillow` + `requests` |
-| UI | Terminal |
-
----
-
-## 📁 Project Structure
-
-```
-diy-shazam/
-├── main.py             # Entry point — mic or file mode
-├── recorder.py         # Record from mic OR load audio file
-├── fft_analyze.py      # Run FFT, plot frequency spectrum
-├── matcher.py          # Send audio to AudD API, get result
-├── display.py          # Print song info, show album art
-├── requirements.txt
-└── README.md
-```
-
----
-
-## ⚡ Setup & Run
-
-### 1. Clone the repo
-
-```bash
-git clone https://github.com/icecold009/diy-shazam.git
-cd diy-shazam
-```
-
-### 2. Install dependencies
-
-```bash
+2) Install runtime deps:
+```powershell
 pip install -r requirements.txt
 ```
-
-### 3. Get your free AudD API key
-
-- Go to [https://audd.io/](https://audd.io/) and sign up for free
-- You get **100 recognitions/day** on the free tier
-- Copy your API token
-
-### 3b. (Optional) Use AcoustID + fpcalc instead of AudD
-
-- If you prefer an open alternative, you can use AcoustID (requires the local `fpcalc`/Chromaprint binary).
-- Install Chromaprint / `fpcalc` for your platform (Windows/macOS/Linux). On many systems it is provided by the `chromaprint` package or a standalone installer. Ensure `fpcalc` is available on your PATH or set `FP_CALC_PATH` in your `.env`.
-- Get an AcoustID API key at https://acoustid.org/ and copy the key.
-
-### 4. Create a `.env` file
-
-```env
-AUDD_API_TOKEN=your_token_here
-
-# Optional: AcoustID key (when set, the app will prefer AcoustID/fpcalc)
-ACOUSTID_API_KEY=
-
-# Optional: full path to fpcalc if it's not on your PATH
-FP_CALC_PATH=
+3) Add configuration:
+```powershell
+copy .env.example .env
+# edit .env to add AUDD_API_TOKEN or other keys
 ```
-
-> ⚠️ Never push your `.env` file to GitHub. It's already in `.gitignore`.
-
-Tip: A committed `.env.example` is included showing these variables — copy it to `.env` and fill in your keys.
-
-### 5. Run the app
-
-```bash
+4) Run CLI:
+```powershell
 python main.py
 ```
+5) Run web UI (dev):
+```powershell
+python web/app.py
+# open http://127.0.0.1:5000
+```
 
-Behavior notes:
-- If `ACOUSTID_API_KEY` is set and `fpcalc` is available, the app will use AcoustID (local fingerprinting) and fall back to AudD if AcoustID fails.
-- If neither service is configured, recognition is disabled but recording and FFT analysis still work.
+## Configuration
+Supported env vars (see `config.load_config()`): `AUDD_API_TOKEN`, `ACOUSTID_API_KEY`, `FP_CALC_PATH`, `RAPIDAPI_KEY`. Matcher order: RapidAPI → AcoustID → AudD.
 
----
+## Web UI
+`web/app.py` exposes `/api/match` for uploads and `/api/status` for tool/backend checks. Non-WAV uploads are converted with `ffmpeg` if present.
 
-## 🖥 Sample Output
+## Testing
+Run tests:
+```powershell
+python -m unittest discover -v
+```
+`tests/test_core.py` covers FFT image creation and a mocked AcoustID flow.
+
+## Notes & Tips
+- Record in a quiet space and keep the mic near the audio source.
+- For AcoustID, install Chromaprint (`fpcalc`): macOS `brew install chromaprint`, Debian/Ubuntu `apt install libchromaprint-tools`.
+- `ffmpeg` is optional for the web upload conversion path.
+
+## Contributing
+
+If you'd like me to help polish the repo further, I can:
+
+- populate `requirements.txt` with the runtime packages used by the code,
+- add a `.env.example`, and
+- add a CI workflow to run tests.
+
+Tell me which you'd like next and I'll apply the change.
+
+## License
+
+MIT — see `LICENSE`.
+
+***
+
+## Example Output
 
 ```
 Listen via microphone or load a file? (mic/file): mic
 
-🎙  Recording for 8 seconds...
-✅  FFT analysis saved to fft_output.png
+Recording for 8 seconds...
+FFT analysis saved to fft_output.png
 
-🎵  Song:    Blinding Lights
-🎤  Artist:  The Weeknd
+Song:    Blinding Lights
+Artist:  The Weeknd
 
 [Album art opens in image viewer]
 ```
 
----
-
-## 📝 Notes
-
-- Record in a **quiet environment** for best recognition results
-- The FFT plot shows the **dominant frequencies** of your audio clip
-- Tested on Windows · macOS · Linux (VSCode terminal)
-
----
-
-## 📚 What I Learned
-
-- How FFT decomposes audio into frequency components
-- How music recognition APIs work under the hood
-- Python audio recording and WAV file handling
-- API calls with multipart file uploads
-- Clean, modular project structure
+FFT spectrum for a sample clip:
 
 
 
-MIT License free to use and modify.
+***
+
+## Web API Reference
+
+| Endpoint       | Method | Description                                           |
+|----------------|--------|-------------------------------------------------------|
+| `/api/match`   | POST   | Upload an audio file for recognition. Returns JSON.  |
+| `/api/status`  | GET    | Reports configured backends, ffmpeg, fpcalc status.  |
+
+**Example — cURL:**
+```bash
+curl -X POST http://localhost:5000/api/match \
+  -F "file=@song.wav"
+```
+
+**Example — Response:**
+```json
+{
+  "status": "matched",
+  "title": "Blinding Lights",
+  "artist": "The Weeknd",
+  "album": "After Hours",
+  "image": "https://..."
+}
+```
+
+`status` is one of: `matched` · `no_match` · `no_token` · `error`
+
+***
+
+## Notes
+
+- Record in a **quiet environment** for best accuracy
+- CLI mic mode requires a working input device; the web UI uses browser microphone
+- File mode (CLI) accepts WAV by default; the web UI converts other formats via `ffmpeg` if available
+- Tested on Windows, macOS, and Linux
+
+***
+
+## Roadmap
+
+- [ ] Add CI — run `pytest` + lint on push
+- [ ] CLI flags: `--mode`, `--duration`, `--file` for unattended/scripted use
+- [ ] Local match history saved as JSON
+- [ ] `--no-open-image` flag for headless environments
+- [ ] Structured logging in `matcher.py` for easier debugging
+- [ ] End-to-end Flask test using the test client with a sample WAV
+
+***
+
+## License
+
+[MIT](LICENSE) — free to use and modify.
