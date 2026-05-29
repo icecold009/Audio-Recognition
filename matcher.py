@@ -223,7 +223,13 @@ def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) ->
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
     tmp.close()
     try:
-        _write_clip_to_wav(clip, Path(tmp.name))
+        max_samples = 5 * clip.sample_rate
+        trimmed = AudioClip(
+            samples=clip.samples[:max_samples],
+            sample_rate=clip.sample_rate,
+            source=clip.source
+        )
+        _write_clip_to_wav(trimmed, Path(tmp.name))
 
         with open(tmp.name, "rb") as f:
             audio_data = base64.b64encode(f.read()).decode("utf-8")

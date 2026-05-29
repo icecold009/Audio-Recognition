@@ -61,7 +61,7 @@ recBtn.addEventListener('click', async () => {
             const file = new File([blob], 'recording.webm', { type: blob.type });
             await postFile(file);
         };
-        mediaRecorder.start();
+        mediaRecorder.start(1000);
         recBtn.disabled = true;
         stopBtn.disabled = false;
         resultDiv.innerText = 'Recording...';
