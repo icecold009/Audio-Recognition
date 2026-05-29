@@ -1,6 +1,6 @@
 # DIY Shazam Development Plan
 
-This document is the implementation and operating plan for the repository. The current code files are placeholders, so this plan covers the full path from environment setup through audio capture, FFT analysis, AudD recognition, result display, and verification.
+This document describes the current implementation and the short-term roadmap for the repository. The codebase already implements CLI and web flows, FFT plotting, three matching backends (RapidAPI/Shazam, AcoustID, AudD), and basic tests. The plan below documents what exists now and what to do next.
 
 ## 1. Project Goal
 
@@ -16,158 +16,131 @@ The repo should stay small, modular, and easy to run on Windows, macOS, and Linu
 
 ## 2. Current Repository State
 
-At the time of this plan, the following files exist but are empty:
+The repository already contains working implementations for the main features:
 
-- `main.py`
-- `recorder.py`
-- `fft_analyze.py`
-- `matcher.py`
-- `display.py`
-- `requirements.txt`
+- `main.py` — CLI entrypoint that orchestrates config loading, audio capture (mic/file), FFT analysis, and matching.
+- `recorder.py` — WAV file loader and microphone recorder (uses `sounddevice` when available). Returns a unified `AudioClip` dataclass.
+- `fft_analyze.py` — Computes FFT with NumPy and writes a frequency-spectrum PNG using Matplotlib (Agg backend).
+- `matcher.py` — Multi-backend matcher: prefers RapidAPI (Shazam) when `RAPIDAPI_KEY` is set, supports AcoustID via local `fpcalc`, and falls back to AudD when `AUDD_API_TOKEN` is configured.
+- `display.py` — Prints formatted results and attempts to download/show album art with Pillow.
+- `web/app.py` — Minimal Flask web UI exposing `/api/match` and `/api/status`, handles uploads and optional ffmpeg conversion.
+- `tests/test_core.py` — Unit tests covering FFT file creation and a mocked AcoustID flow.
 
-The README describes the intended behavior, but the implementation still needs to be written.
+The README and code are in sync with the implemented features.
 
 ## 3. Required Environment
 
-### Python version
+### Python
 
-- Use Python 3.10 or newer.
+- Python 3.10+ is recommended (code uses modern typing and dataclasses).
 
 ### System requirements
 
-- A working microphone for record mode.
-- Internet access for the AudD API.
-- A terminal capable of showing Unicode text.
-- Optional image viewer support for album art.
+- Microphone for CLI mic mode (or browser microphone for web UI).
+- `ffmpeg` is optional but recommended for the web upload conversion path.
+- `fpcalc` (Chromaprint) is required only if you want AcoustID fingerprinting.
 
 ### Runtime configuration
 
-- Create a `.env` file at the repo root.
-- Store the AudD token in `AUDD_API_TOKEN`.
-- Do not commit secrets or generated audio artifacts.
+- Place tokens/config in a `.env` at the repo root. Keys supported by `config.load_config()`:
+	- `AUDD_API_TOKEN` (AudD)
+	- `ACOUSTID_API_KEY` (AcoustID)
+	- `FP_CALC_PATH` (optional full path to `fpcalc`)
+	- `RAPIDAPI_KEY` (RapidAPI/Shazam)
 
-## 4. Dependencies To Add
+The app will try RapidAPI → AcoustID → AudD in that order, depending on available configuration.
 
-The `requirements.txt` file is empty and should be populated with the libraries needed for the app.
+## 4. Dependencies
 
-Recommended package set:
+Populate `requirements.txt` with the runtime libraries used by the code:
 
 - `numpy`
-- `scipy`
-- `matplotlib`
-- `sounddevice`
-- `soundfile` if file loading or WAV handling needs it
-- `requests`
-- `python-dotenv`
-- `Pillow`
+- `matplotlib` (plotting; code uses Agg backend for headless use)
+- `requests` (HTTP calls)
+- `python-dotenv` (env loading)
+- `pillow` (image handling)
+- `sounddevice` (optional, required for CLI mic recording)
+- `flask` (web UI)
 
-If the implementation uses only built-in WAV support for file mode, `soundfile` may not be necessary.
+Optional developer/system dependencies:
+
+- `ffmpeg` (external binary, used by the web app to convert uploads when necessary)
+- `fpcalc` / Chromaprint (external binary for AcoustID fingerprinting)
 
 ## 5. Target File Responsibilities
 
-### `main.py`
+### `main.py` (existing)
 
-This should be the orchestration layer.
+`main.py` implements the orchestration described above. It:
 
-Responsibilities:
+- Loads config via `config.load_config()` and reports missing tokens/backends.
+- Accepts `mic` or `file` input, uses `recorder.record_microphone()` or `recorder.load_audio_file()`.
+- Runs `fft_analyze.analyze_audio()` and writes the output PNG.
+- Calls `matcher.match_audio()` and renders results via `display.show_result()`.
 
-1. Prompt the user to choose microphone mode or file mode.
-2. Collect the input audio path or record audio as needed.
-3. Pass audio data through FFT analysis.
-4. Pass the same audio clip to the recognition step.
-5. Hand the final result to the display layer.
-6. Handle top-level errors and keep the terminal output readable.
+The CLI already includes error handling for input and analysis failures.
 
-Expected structure:
+### `recorder.py` (existing)
 
-- `main()` function.
-- Input selection prompt.
-- Sequential calls into the other modules.
-- A final success or failure message.
+Implemented responsibilities:
 
-### `recorder.py`
+- Loads WAV files using the standard `wave` module (supports 8/16/32-bit PCM conversions).
+- Records from the microphone with `sounddevice` when available, returning a float32 mono `AudioClip`.
+- Normalizes stereo → mono by averaging channels and returns `AudioClip(samples, sample_rate, source, path)`.
 
-This should manage audio acquisition.
+Notes:
 
-Responsibilities:
+- File-mode currently accepts only WAV files; the web UI attempts ffmpeg conversion for other formats before loading.
 
-1. Record audio from the microphone for a fixed duration.
-2. Load an audio file from disk.
-3. Normalize output into one consistent in-memory format for downstream steps.
-4. Validate sample rate, duration, and file existence.
-5. Save or return the captured audio clip in a format the matcher and FFT analyzer can use.
+### `fft_analyze.py` (existing)
 
-Implementation notes:
+Implemented responsibilities:
 
-- Support at least WAV files for the first version.
-- Convert stereo input to mono if needed.
-- Make it explicit when recording starts and ends.
-- Return metadata such as sample rate and source type.
+- Computes real FFT with NumPy and saves a labeled PNG using Matplotlib (Agg backend).
+- Validates non-empty samples and positive sample rate.
 
-### `fft_analyze.py`
+Output:
 
-This should generate the frequency-spectrum analysis.
+- Default file: `fft_output.png` (configurable via `AppConfig.fft_output_path`).
 
-Responsibilities:
+### `matcher.py` (existing)
 
-1. Accept raw audio samples and sample rate.
-2. Compute the FFT.
-3. Derive the magnitude spectrum.
-4. Plot the spectrum with Matplotlib.
-5. Save the plot to a predictable file, such as `fft_output.png`.
+Implemented responsibilities and behavior:
 
-Implementation notes:
+- Provides three backends and chooses the first available in this order: RapidAPI (Shazam) → AcoustID → AudD.
+- Writes a temporary 16-bit WAV from the `AudioClip` for upload/fingerprinting.
+- Calls external `fpcalc` for AcoustID if configured (or uses `FP_CALC_PATH`).
+- Returns normalized result dictionaries: `status` is one of `matched`, `no_match`, `no_token`, or `error`. When matched, keys include `title`, `artist`, `album`, and optional `image` URL.
 
-- Use a clear filename and overwrite it consistently.
-- Ensure the plot labels are readable.
-- Keep the function deterministic so the same input produces the same plot.
+Notes:
 
-### `matcher.py`
+- The RapidAPI path encodes audio to base64 and posts to the Shazam RapidAPI endpoint.
+- The AudD path posts a file to `https://api.audd.io/` and extracts album art from multiple potential fields.
 
-This should perform the AudD API request and parse the response.
+### `display.py` (existing)
 
-Responsibilities:
+Implemented responsibilities:
 
-1. Read `AUDD_API_TOKEN` from the environment.
-2. Upload the audio clip using the AudD recognition endpoint.
-3. Handle request errors, timeouts, and non-200 responses.
-4. Parse the returned JSON.
-5. Return the relevant song metadata.
+- Prints song metadata to the terminal with emoji markers.
+- If an image URL is present, attempts to download it and show it with Pillow (`Image.show()`), but failures are logged to stdout and do not halt the program.
 
-Implementation notes:
+## 6. End-to-End Workflow (current)
 
-- Support a clear `no match` response.
-- Keep API-specific details isolated in this file.
-- Use a timeout so the app does not hang indefinitely.
+CLI:
 
-### `display.py`
+1. `python main.py` → load `.env` → report missing tokens/backends.
+2. Choose `mic` or `file`.
+3. Capture or load audio into `AudioClip`.
+4. Run `fft_analyze.analyze_audio()` → write PNG.
+5. Run `matcher.match_audio()` → choose backend according to config.
+6. Display with `display.show_result()`.
 
-This should format the final result for the terminal and optionally show artwork.
+Web UI (`web/app.py`):
 
-Responsibilities:
-
-1. Print the song title and artist in a readable format.
-2. Display album art if a URL is available.
-3. Handle image download failures gracefully.
-4. Keep the terminal output concise and consistent.
-
-Implementation notes:
-
-- If image display fails, still print the text result.
-- Avoid breaking the main flow because artwork cannot be loaded.
-
-## 6. End-to-End Workflow
-
-The application should follow this sequence:
-
-1. User runs `python main.py`.
-2. The app asks whether to use microphone input or an audio file.
-3. The app records or loads audio.
-4. The audio is normalized into a consistent sample buffer.
-5. FFT analysis runs and writes `fft_output.png`.
-6. The audio is sent to AudD.
-7. The app prints the match result.
-8. If artwork is available, it is shown separately from the text output.
+1. POST a file to `/api/match` (browser or cURL).
+2. Server optionally converts non-WAV uploads using `ffmpeg` (if available).
+3. Loads a WAV and runs the same `matcher.match_audio()` code path.
+4. `/api/status` reports configuration bits (fpcalc, ffmpeg, tokens).
 
 ## 7. Implementation Procedure
 
@@ -192,34 +165,22 @@ Follow this order to avoid rework.
 2. Save the output plot to `fft_output.png`.
 3. Verify the plot is created for both mic and file inputs.
 
-### Step 4: Add AudD matching
+## 7. Testing & Validation (current)
 
-1. Implement environment-variable loading in `matcher.py`.
-2. Send the audio clip to the AudD API.
-3. Parse the response into a structured result object or dictionary.
-4. Handle failures cleanly.
+- Unit tests exist in `tests/test_core.py` and cover FFT image creation and a mocked AcoustID fingerprint flow.
+- Recommended additional tests:
+	- Mock RapidAPI and AudD responses to assert normalized result shapes.
+	- Test `recorder.record_microphone()` behavior with a monkeypatched `sounddevice` object (CI skip when device missing).
+	- End-to-end integration test for the Flask `/api/match` route using the Flask test client.
 
-### Step 5: Add display logic
+## 8. Short-term Roadmap (recommended)
 
-1. Implement formatted terminal output in `display.py`.
-2. Add album-art download and display support.
-3. Preserve result printing even when image display fails.
-
-### Step 6: Wire everything in `main.py`
-
-1. Connect input selection to audio capture.
-2. Run FFT before recognition.
-3. Pass recognition results to the display function.
-4. Add top-level exception handling.
-
-### Step 7: Validate the app
-
-1. Test microphone mode.
-2. Test file mode with a known WAV sample.
-3. Test no-match behavior.
-4. Test missing token behavior.
-5. Test bad file input behavior.
-6. Confirm the FFT image is generated each run.
+1. Populate `requirements.txt` with the packages listed in section 4.
+2. Add CI that runs `pytest` or `python -m unittest` and lints imports.
+3. Add a small `.env.example` file documenting supported keys (if not already present).
+4. Add CLI arguments (optional) to `main.py` for `--mode`, `--duration`, and `--file` to enable non-interactive usage.
+5. Improve error logging (structured logs) in `matcher.py` for easier debugging of external errors.
+6. Add a small e2e test for the web API using an uploaded sample clip.
 
 ## 8. Operational Procedures
 
@@ -255,18 +216,27 @@ Follow this order to avoid rework.
 4. If AudD returns no match, print a clear no-match status.
 5. If album art cannot be loaded, keep the song result visible.
 
-## 9. Testing Checklist
 
-Minimum checks to run before considering the app usable:
+## 9. Quick Run Instructions
 
-1. `main.py` launches without import errors.
-2. Microphone mode can capture a clip.
-3. File mode can load a WAV file.
-4. FFT analysis writes `fft_output.png`.
-5. AudD response parsing works for success and no-match payloads.
-6. Missing-token handling works.
-7. Invalid-input handling works.
-8. Album art failure does not break the program.
+CLI:
+
+```powershell
+python main.py
+```
+
+Web UI (dev):
+
+```powershell
+python web/app.py
+# then open http://127.0.0.1:5000
+```
+
+Run tests:
+
+```powershell
+python -m unittest discover -v
+```
 
 ## 10. Suggested Output Standards
 
@@ -278,22 +248,23 @@ Keep terminal output consistent:
 4. Show the recognized song title and artist on separate lines.
 5. Show a final success or failure state.
 
-## 11. Future Improvements
+## 10. Future Improvements
 
-After the first working version, consider:
+- Add CI and automated tests.
+- Add a lightweight history/log feature (JSON) to save matches locally.
+- Add CLI flags for unattended runs and a `--no-open-image` option.
+- Allow file-mode imports beyond WAV via server-side ffmpeg conversion (already attempted in web path).
 
-1. Adding unit tests for each module.
-2. Supporting more audio formats.
-3. Adding command-line arguments for duration and input path.
-4. Saving recognition history to a local file.
-5. Adding a small CLI help message.
+## 11. Done Criteria
 
-## 12. Done Criteria
+- CLI and web flows run without import errors.
+- FFT output is generated for both mic and file inputs.
+- Matching returns normalized structured results and the display layer renders them without crashing.
 
-The project is complete when:
+---
 
-1. A user can run the app from a clean install.
-2. Both mic and file workflows work end to end.
-3. FFT output is saved reliably.
-4. AudD results are displayed clearly.
-5. Failure cases are handled without crashing.
+If you'd like, I can also:
+
+- Open a patch to populate `requirements.txt` with the recommended packages.
+- Add a `.env.example` file and a short CI workflow to run the tests.
+
