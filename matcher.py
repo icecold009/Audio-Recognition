@@ -10,6 +10,7 @@ import shutil
 import logging
 import requests
 from typing import Any
+import base64
 
 import numpy as np
 
@@ -225,7 +226,7 @@ def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) ->
         _write_clip_to_wav(clip, Path(tmp.name))
 
         with open(tmp.name, "rb") as f:
-            audio_data = f.read()
+            audio_data = base64.b64encode(f.read()).decode("utf-8")
 
         headers = {
             "content-type": "text/plain",
