@@ -60,8 +60,22 @@ python web/app.py
 # open http://127.0.0.1:5000
 ```
 
+## Project Structure
+Core source modules now live under `shazam_project/`:
+
+- `shazam_project/config.py`
+- `shazam_project/recorder.py`
+- `shazam_project/fft_analyze.py`
+- `shazam_project/matcher.py`
+- `shazam_project/display.py`
+
+Entrypoints remain:
+
+- `main.py` (CLI)
+- `web/app.py` (Flask web app)
+
 ## Configuration
-Supported env vars (see `config.load_config()`): `AUDD_API_TOKEN`, `ACOUSTID_API_KEY`, `FP_CALC_PATH`, `RAPIDAPI_KEY`. Matcher order: RapidAPI → AcoustID → AudD.
+Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`, `ACOUSTID_API_KEY`, `FP_CALC_PATH`, `RAPIDAPI_KEY`. Matcher order: RapidAPI → AcoustID → AudD.
 
 ## Web UI
 `web/app.py` exposes `/api/match` for uploads and `/api/status` for tool/backend checks. Non-WAV uploads are converted with `ffmpeg` if present.
@@ -157,7 +171,7 @@ curl -X POST http://localhost:5000/api/match \
 - [ ] CLI flags: `--mode`, `--duration`, `--file` for unattended/scripted use
 - [ ] Local match history saved as JSON
 - [ ] `--no-open-image` flag for headless environments
-- [ ] Structured logging in `matcher.py` for easier debugging
+- [ ] Structured logging in `shazam_project/matcher.py` for easier debugging
 - [ ] End-to-end Flask test using the test client with a sample WAV
 
 ***

@@ -1,14 +1,14 @@
-import unittest
 import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+import unittest
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from fft_analyze import analyze_audio
-from recorder import AudioClip
-import matcher
-from config import AppConfig
+from shazam_project.config import AppConfig
+from shazam_project.fft_analyze import analyze_audio
+from shazam_project import matcher
+from shazam_project.recorder import AudioClip
 
 
 class CoreTests(unittest.TestCase):
@@ -24,9 +24,9 @@ class CoreTests(unittest.TestCase):
         except Exception:
             pass
 
-    @patch("matcher.subprocess.run")
-    @patch("matcher.requests.get")
-    @patch("matcher.shutil.which", return_value="fpcalc")
+    @patch("shazam_project.matcher.subprocess.run")
+    @patch("shazam_project.matcher.requests.get")
+    @patch("shazam_project.matcher.shutil.which", return_value="fpcalc")
     def test_match_audio_acoustid_mock(self, mock_which, mock_get, mock_run):
         # fake fpcalc output
         fake_proc = MagicMock()

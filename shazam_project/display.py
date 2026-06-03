@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
-import requests
 from io import BytesIO
+from typing import Any
 
 from PIL import Image
+import requests
 
 
 def show_result(result: dict[str, Any], open_image: bool = True) -> None:

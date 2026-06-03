@@ -1,17 +1,27 @@
 from __future__ import annotations
 
 import os
-import tempfile
-from flask import Flask, request, jsonify, render_template
-import requests
 import shutil
 import subprocess
+import tempfile
 
-from config import load_config
-from recorder import load_audio_file
-import matcher
+from flask import Flask, jsonify, render_template, request
+
+from shazam_project import matcher
+from shazam_project.config import load_config
+from shazam_project.recorder import load_audio_file
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+
+
+def _safe_unlink(path: str | None) -> None:
+    if not path:
+        return
+    try:
+        if os.path.exists(path):
+            os.unlink(path)
+    except Exception:
+        pass
 
 
 @app.route("/")
@@ -23,14 +33,13 @@ def index():
 def api_match():
     cfg = load_config()
 
-
     if "file" not in request.files:
         return jsonify({"status": "error", "error": "No file uploaded"}), 400
 
     f = request.files["file"]
     # Save uploaded blob to a temp file
-    filename = getattr(f, 'filename', None) or 'upload'
-    suffix = os.path.splitext(filename)[1] or ''
+    filename = getattr(f, "filename", None) or "upload"
+    suffix = os.path.splitext(filename)[1] or ""
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     wav_path = None
     try:
@@ -39,13 +48,13 @@ def api_match():
 
         # If not WAV, try to convert to WAV using ffmpeg for compatibility
         wav_path = tmp.name
-        if not tmp.name.lower().endswith('.wav'):
-            ffmpeg_exe = shutil.which('ffmpeg')
+        if not tmp.name.lower().endswith(".wav"):
+            ffmpeg_exe = shutil.which("ffmpeg")
             if ffmpeg_exe:
-                conv_tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+                conv_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
                 conv_tmp.close()
                 try:
-                    cmd = [ffmpeg_exe, '-y', '-i', tmp.name, '-ar', '44100', '-ac', '1', conv_tmp.name]
+                    cmd = [ffmpeg_exe, "-y", "-i", tmp.name, "-ar", "44100", "-ac", "1", conv_tmp.name]
                     subprocess.run(cmd, check=True, capture_output=True)
                     wav_path = conv_tmp.name
                 except subprocess.CalledProcessError:
@@ -71,25 +80,10 @@ def api_match():
         return jsonify({"status": "error", "error": str(exc)}), 500
     finally:
         # clean up any temporary files we created; be defensive about existence
-        try:
-            if 'tmp' in locals() and getattr(tmp, 'name', None):
-                if os.path.exists(tmp.name):
-                    try:
-                        os.unlink(tmp.name)
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-        try:
-            if wav_path and wav_path != getattr(tmp, 'name', None):
-                if os.path.exists(wav_path):
-                    try:
-                        os.unlink(wav_path)
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+        tmp_name = getattr(tmp, "name", None) if "tmp" in locals() else None
+        _safe_unlink(tmp_name)
+        if wav_path != tmp_name:
+            _safe_unlink(wav_path)
 
 
 @app.route("/api/status", methods=["GET"])

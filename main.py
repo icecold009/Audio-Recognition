@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from config import load_config, missing_configuration
-from fft_analyze import analyze_audio
-from recorder import load_audio_file, record_microphone
-from matcher import match_audio
-from display import show_result
+from shazam_project.config import load_config, missing_configuration
+from shazam_project.display import show_result
+from shazam_project.fft_analyze import analyze_audio
+from shazam_project.matcher import match_audio
+from shazam_project.recorder import load_audio_file, record_microphone
 
 
 def main() -> int:

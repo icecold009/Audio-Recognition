@@ -19,10 +19,10 @@ The repo should stay small, modular, and easy to run on Windows, macOS, and Linu
 The repository already contains working implementations for the main features:
 
 - `main.py` — CLI entrypoint that orchestrates config loading, audio capture (mic/file), FFT analysis, and matching.
-- `recorder.py` — WAV file loader and microphone recorder (uses `sounddevice` when available). Returns a unified `AudioClip` dataclass.
-- `fft_analyze.py` — Computes FFT with NumPy and writes a frequency-spectrum PNG using Matplotlib (Agg backend).
-- `matcher.py` — Multi-backend matcher: prefers RapidAPI (Shazam) when `RAPIDAPI_KEY` is set, supports AcoustID via local `fpcalc`, and falls back to AudD when `AUDD_API_TOKEN` is configured.
-- `display.py` — Prints formatted results and attempts to download/show album art with Pillow.
+- `shazam_project/recorder.py` — WAV file loader and microphone recorder (uses `sounddevice` when available). Returns a unified `AudioClip` dataclass.
+- `shazam_project/fft_analyze.py` — Computes FFT with NumPy and writes a frequency-spectrum PNG using Matplotlib (Agg backend).
+- `shazam_project/matcher.py` — Multi-backend matcher: prefers RapidAPI (Shazam) when `RAPIDAPI_KEY` is set, supports AcoustID via local `fpcalc`, and falls back to AudD when `AUDD_API_TOKEN` is configured.
+- `shazam_project/display.py` — Prints formatted results and attempts to download/show album art with Pillow.
 - `web/app.py` — Minimal Flask web UI exposing `/api/match` and `/api/status`, handles uploads and optional ffmpeg conversion.
 - `tests/test_core.py` — Unit tests covering FFT file creation and a mocked AcoustID flow.
 
@@ -42,7 +42,7 @@ The README and code are in sync with the implemented features.
 
 ### Runtime configuration
 
-- Place tokens/config in a `.env` at the repo root. Keys supported by `config.load_config()`:
+- Place tokens/config in a `.env` at the repo root. Keys supported by `shazam_project.config.load_config()`:
 	- `AUDD_API_TOKEN` (AudD)
 	- `ACOUSTID_API_KEY` (AcoustID)
 	- `FP_CALC_PATH` (optional full path to `fpcalc`)
@@ -73,14 +73,14 @@ Optional developer/system dependencies:
 
 `main.py` implements the orchestration described above. It:
 
-- Loads config via `config.load_config()` and reports missing tokens/backends.
-- Accepts `mic` or `file` input, uses `recorder.record_microphone()` or `recorder.load_audio_file()`.
-- Runs `fft_analyze.analyze_audio()` and writes the output PNG.
-- Calls `matcher.match_audio()` and renders results via `display.show_result()`.
+- Loads config via `shazam_project.config.load_config()` and reports missing tokens/backends.
+- Accepts `mic` or `file` input, uses `shazam_project.recorder.record_microphone()` or `shazam_project.recorder.load_audio_file()`.
+- Runs `shazam_project.fft_analyze.analyze_audio()` and writes the output PNG.
+- Calls `shazam_project.matcher.match_audio()` and renders results via `shazam_project.display.show_result()`.
 
 The CLI already includes error handling for input and analysis failures.
 
-### `recorder.py` (existing)
+### `shazam_project/recorder.py` (existing)
 
 Implemented responsibilities:
 
@@ -92,7 +92,7 @@ Notes:
 
 - File-mode currently accepts only WAV files; the web UI attempts ffmpeg conversion for other formats before loading.
 
-### `fft_analyze.py` (existing)
+### `shazam_project/fft_analyze.py` (existing)
 
 Implemented responsibilities:
 
@@ -103,7 +103,7 @@ Output:
 
 - Default file: `fft_output.png` (configurable via `AppConfig.fft_output_path`).
 
-### `matcher.py` (existing)
+### `shazam_project/matcher.py` (existing)
 
 Implemented responsibilities and behavior:
 
@@ -117,7 +117,7 @@ Notes:
 - The RapidAPI path encodes audio to base64 and posts to the Shazam RapidAPI endpoint.
 - The AudD path posts a file to `https://api.audd.io/` and extracts album art from multiple potential fields.
 
-### `display.py` (existing)
+### `shazam_project/display.py` (existing)
 
 Implemented responsibilities:
 
@@ -131,15 +131,15 @@ CLI:
 1. `python main.py` → load `.env` → report missing tokens/backends.
 2. Choose `mic` or `file`.
 3. Capture or load audio into `AudioClip`.
-4. Run `fft_analyze.analyze_audio()` → write PNG.
-5. Run `matcher.match_audio()` → choose backend according to config.
-6. Display with `display.show_result()`.
+4. Run `shazam_project.fft_analyze.analyze_audio()` → write PNG.
+5. Run `shazam_project.matcher.match_audio()` → choose backend according to config.
+6. Display with `shazam_project.display.show_result()`.
 
 Web UI (`web/app.py`):
 
 1. POST a file to `/api/match` (browser or cURL).
 2. Server optionally converts non-WAV uploads using `ffmpeg` (if available).
-3. Loads a WAV and runs the same `matcher.match_audio()` code path.
+3. Loads a WAV and runs the same `shazam_project.matcher.match_audio()` code path.
 4. `/api/status` reports configuration bits (fpcalc, ffmpeg, tokens).
 
 ## 7. Implementation Procedure
@@ -154,14 +154,14 @@ Follow this order to avoid rework.
 
 ### Step 2: Build audio input first
 
-1. Implement microphone recording in `recorder.py`.
+1. Implement microphone recording in `shazam_project/recorder.py`.
 2. Implement audio file loading in the same module.
 3. Make both return the same data shape.
 4. Validate that the app can acquire one clip from each input path.
 
 ### Step 3: Add FFT analysis
 
-1. Implement the FFT function in `fft_analyze.py`.
+1. Implement the FFT function in `shazam_project/fft_analyze.py`.
 2. Save the output plot to `fft_output.png`.
 3. Verify the plot is created for both mic and file inputs.
 
@@ -170,7 +170,7 @@ Follow this order to avoid rework.
 - Unit tests exist in `tests/test_core.py` and cover FFT image creation and a mocked AcoustID fingerprint flow.
 - Recommended additional tests:
 	- Mock RapidAPI and AudD responses to assert normalized result shapes.
-	- Test `recorder.record_microphone()` behavior with a monkeypatched `sounddevice` object (CI skip when device missing).
+	- Test `shazam_project.recorder.record_microphone()` behavior with a monkeypatched `sounddevice` object (CI skip when device missing).
 	- End-to-end integration test for the Flask `/api/match` route using the Flask test client.
 
 ## 8. Short-term Roadmap (recommended)
@@ -179,7 +179,7 @@ Follow this order to avoid rework.
 2. Add CI that runs `pytest` or `python -m unittest` and lints imports.
 3. Add a small `.env.example` file documenting supported keys (if not already present).
 4. Add CLI arguments (optional) to `main.py` for `--mode`, `--duration`, and `--file` to enable non-interactive usage.
-5. Improve error logging (structured logs) in `matcher.py` for easier debugging of external errors.
+5. Improve error logging (structured logs) in `shazam_project/matcher.py` for easier debugging of external errors.
 6. Add a small e2e test for the web API using an uploaded sample clip.
 
 ## 8. Operational Procedures

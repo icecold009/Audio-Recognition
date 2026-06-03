@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-from pathlib import Path
-import tempfile
-import wave
-import os
-import subprocess
-import json
-import shutil
-import logging
-import requests
-from typing import Any
 import base64
+import json
+import logging
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+from typing import Any
+import wave
 
 import numpy as np
+import requests
 
-from recorder import AudioClip
-from config import AppConfig
+from .config import AppConfig
+from .recorder import AudioClip
 
 
 AUDD_ENDPOINT = "https://api.audd.io/"
@@ -33,6 +33,23 @@ def _write_clip_to_wav(clip: AudioClip, path: Path) -> None:
         wf.setsampwidth(2)
         wf.setframerate(int(clip.sample_rate))
         wf.writeframes(int16.tobytes())
+
+
+def _extract_audd_image(body: dict[str, Any]) -> str | None:
+    img = body.get("album_cover")
+    if img:
+        return img
+
+    spotify = body.get("spotify") or {}
+    if isinstance(spotify, dict):
+        album_obj = spotify.get("album")
+        if isinstance(album_obj, dict):
+            images = album_obj.get("images") or []
+            if images and isinstance(images, list):
+                first = images[0]
+                if isinstance(first, dict):
+                    return first.get("url")
+    return None
 
 
 def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
@@ -78,22 +95,7 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
         artist = res.get("artist") or ""
         album = res.get("album") or ""
 
-        def _extract_image(body: dict) -> str | None:
-            img = body.get("album_cover")
-            if img:
-                return img
-            spotify = body.get("spotify") or {}
-            if isinstance(spotify, dict):
-                album_obj = spotify.get("album")
-                if isinstance(album_obj, dict):
-                    images = album_obj.get("images") or []
-                    if images and isinstance(images, list):
-                        first = images[0]
-                        if isinstance(first, dict):
-                            return first.get("url")
-            return None
-
-        image = _extract_image(res)
+        image = _extract_audd_image(res)
 
         return {
             "status": "matched",
@@ -227,7 +229,7 @@ def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) ->
         trimmed = AudioClip(
             samples=clip.samples[:max_samples],
             sample_rate=clip.sample_rate,
-            source=clip.source
+            source=clip.source,
         )
         _write_clip_to_wav(trimmed, Path(tmp.name))
 
@@ -237,14 +239,14 @@ def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) ->
         headers = {
             "content-type": "text/plain",
             "X-RapidAPI-Key": config.rapidapi_key,
-            "X-RapidAPI-Host": "shazam.p.rapidapi.com"
+            "X-RapidAPI-Host": "shazam.p.rapidapi.com",
         }
 
         resp = requests.post(
             "https://shazam.p.rapidapi.com/songs/detect",
             headers=headers,
             data=audio_data,
-            timeout=timeout
+            timeout=timeout,
         )
 
         if resp.status_code != 200:
