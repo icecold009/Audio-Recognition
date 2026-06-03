@@ -10,6 +10,8 @@
 
 This document describes every screen the user can visit and the transitions between them. Navigation is client-side (React Router). There are two user modes: **Guest** (no login, session-only history) and **Authenticated** (persistent history).
 
+Error handling should stay user-safe: auth failures and permission errors must show brief, generic messages and should not expose internal stack traces, provider names, or backend implementation details.
+
 ---
 
 ## Site Map

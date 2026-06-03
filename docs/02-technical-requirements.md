@@ -144,6 +144,12 @@ IDLE ──[click mic]──▶ REQUESTING_PERMISSION
 All routes validate JWT from `Authorization: Bearer <token>` header.  
 API keys (`RAPIDAPI_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) live in Vercel environment variables — never exposed to the client.
 
+### Security Boundary
+
+- API keys stay server-side only.
+- The browser must never call RapidAPI directly.
+- Client code talks only to the app's own backend routes, which proxy recognition requests and keep secrets hidden.
+
 ---
 
 ## Audio Capture Specification

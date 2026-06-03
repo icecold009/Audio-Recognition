@@ -258,6 +258,7 @@ CSS:
 ## Accessibility
 
 - **Color contrast:** All text/background combinations meet WCAG AA (4.5:1 for body, 3:1 for large text)
+- **Safe content rendering:** External links must use safe link handling (`rel="noopener noreferrer"` for new tabs), and dynamic content should be inserted without `innerHTML`.
 - **Focus indicators:** 2px `--color-primary` outline, 3px offset, on all interactive elements
 - **Mic button aria-label:** "Identify song" (IDLE), "Stop listening" (LISTENING)
 - **Waveform aria-live:** `aria-live="polite"` region announces "Listening…" and "Identifying…"

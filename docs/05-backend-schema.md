@@ -157,6 +157,8 @@ create index idx_recognition_history_title
 
 RLS ensures users can only access their own data. Every table has RLS enabled.
 
+RLS must stay strict: anonymous access should be denied by default, and policies should be verified with unauthenticated requests before release.
+
 ### `profiles` RLS
 
 ```sql
@@ -201,6 +203,14 @@ create policy "history: delete own"
   for delete
   using (auth.uid() = user_id);
 ```
+
+### Anonymous Access Validation
+
+Test the schema with an anon key and no session to confirm that:
+
+- `select`, `insert`, `update`, and `delete` are rejected unless a valid user owns the row.
+- No rows are visible from `auth.uid() = null`.
+- Service-role access is reserved for trusted backend operations only.
 
 ---
 

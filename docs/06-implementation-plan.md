@@ -346,6 +346,13 @@ Each route:
 - [ ] Verify LCP < 2.0s on 4G throttle
 - [ ] Add `loading="lazy"` and dimensions to all `<img>` tags
 
+### Step 7.6 — Security Hardening
+- [ ] Add CSP headers and keep them restrictive by default
+- [ ] Add rate limiting for recognition and history endpoints
+- [ ] Enable secret scanning in the repository and CI
+- [ ] Protect production deployments with branch protection and required checks
+- [ ] Verify environment variables are never exposed to the client bundle
+
 **✅ Phase 7 done when:** Lighthouse scores ≥ 90, all states handled, mobile tested on real device.
 
 ---
