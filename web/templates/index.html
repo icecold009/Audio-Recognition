@@ -4,9 +4,8 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Music Recognition</title>
+    <title>DIY Shazam</title>
 
-    <!-- Fonts: Sora (display) · Inter (UI) · JetBrains Mono (meta) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -14,7 +13,6 @@
         rel="stylesheet" />
 
     <style>
-        /* ─── Reset ─────────────────────────────────────────── */
         *,
         *::before,
         *::after {
@@ -23,9 +21,7 @@
             padding: 0;
         }
 
-        /* ─── Design Tokens ─────────────────────────────────── */
         :root {
-            /* Dark theme (default) */
             --color-bg: #0d0d0f;
             --color-surface: #13131a;
             --color-surface-2: #1a1a24;
@@ -48,20 +44,17 @@
             --color-wave-1: #1da1f2;
             --color-wave-2: rgba(29, 161, 242, 0.3);
 
-            /* Typography scale */
             --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
             --text-sm: clamp(0.875rem, 0.8rem + 0.35vw, 1rem);
             --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
             --text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
             --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
 
-            /* Radius */
             --radius-sm: 6px;
             --radius-md: 8px;
             --radius-lg: 12px;
             --radius-xl: 16px;
 
-            /* Spacing */
             --space-1: 4px;
             --space-2: 8px;
             --space-3: 12px;
@@ -72,7 +65,6 @@
             --space-16: 64px;
         }
 
-        /* Light theme override */
         [data-theme="light"] {
             --color-bg: #f5f5f8;
             --color-surface: #ffffff;
@@ -88,7 +80,6 @@
             --color-primary-glow: rgba(13, 141, 214, 0.12);
         }
 
-        /* ─── Base ───────────────────────────────────────────── */
         html {
             font-size: 100%;
             color-scheme: dark;
@@ -102,24 +93,19 @@
             min-height: 100vh;
             font-family: 'Inter', system-ui, sans-serif;
             font-size: var(--text-base);
-            font-weight: 400;
             line-height: 1.6;
             color: var(--color-text);
             background-color: var(--color-bg);
-            background-image: radial-gradient(ellipse 80% 40% at 50% -10%,
-                    var(--color-primary-glow),
-                    transparent);
+            background-image: radial-gradient(ellipse 80% 40% at 50% -10%, var(--color-primary-glow), transparent);
             transition: background-color 250ms ease, color 250ms ease;
         }
 
-        /* ─── Layout ─────────────────────────────────────────── */
         .app-wrap {
             width: min(100%, 960px);
             margin: 0 auto;
             padding: var(--space-6) var(--space-4) var(--space-16);
         }
 
-        /* ─── Header ─────────────────────────────────────────── */
         .app-header {
             display: flex;
             align-items: center;
@@ -165,7 +151,6 @@
             color: var(--color-primary);
         }
 
-        /* Theme toggle button */
         .theme-toggle {
             width: 40px;
             height: 40px;
@@ -192,7 +177,6 @@
             height: 18px;
         }
 
-        /* Hide the icon not in use */
         [data-theme="dark"] .icon-sun {
             display: block;
         }
@@ -209,7 +193,6 @@
             display: block;
         }
 
-        /* ─── Typography helpers ─────────────────────────────── */
         .page-title {
             font-family: 'Sora', sans-serif;
             font-weight: 800;
@@ -239,7 +222,6 @@
             color: var(--color-text-faint);
         }
 
-        /* ─── Panel / Card ───────────────────────────────────── */
         .panel {
             background: var(--color-surface);
             border: 1px solid var(--color-border);
@@ -254,7 +236,6 @@
             gap: var(--space-3);
         }
 
-        /* ─── Form elements ──────────────────────────────────── */
         label {
             display: grid;
             gap: var(--space-2);
@@ -274,7 +255,6 @@
             color: var(--color-text);
             font: inherit;
             font-size: var(--text-sm);
-            transition: border-color 180ms ease;
         }
 
         input[type="file"]:focus {
@@ -306,7 +286,6 @@
             margin: var(--space-4) 0;
         }
 
-        /* ─── Buttons ────────────────────────────────────────── */
         button {
             border: 0;
             border-radius: 999px;
@@ -348,7 +327,6 @@
             gap: var(--space-3);
         }
 
-        /* ─── Status bar ─────────────────────────────────────── */
         #status {
             font-family: 'JetBrains Mono', monospace;
             font-size: var(--text-xs);
@@ -361,7 +339,6 @@
             line-height: 1.7;
         }
 
-        /* ─── Result area ────────────────────────────────────── */
         #result {
             display: grid;
             gap: var(--space-2);
@@ -378,16 +355,57 @@
             border-radius: var(--radius-lg);
         }
 
-        /* ─── Divider spacing ────────────────────────────────── */
-        .mt-4 {
-            margin-top: var(--space-4);
+        .hero {
+            display: grid;
+            gap: var(--space-6);
+            margin-bottom: var(--space-8);
         }
 
-        .mt-6 {
-            margin-top: var(--space-6);
+        .hero-copy {
+            display: grid;
+            gap: var(--space-2);
         }
 
-        /* ─── Reduced motion ─────────────────────────────────── */
+        .cta-shell {
+            display: grid;
+            gap: var(--space-4);
+        }
+
+        .mic-cta {
+            width: 96px;
+            height: 96px;
+            border-radius: 50%;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--color-primary);
+            box-shadow: 0 0 0 0 var(--color-primary-glow);
+        }
+
+        .mic-cta svg {
+            width: 38px;
+            height: 38px;
+            fill: #fff;
+        }
+
+        .waveform {
+            height: 64px;
+            display: flex;
+            align-items: end;
+            justify-content: center;
+            gap: 4px;
+            padding: 8px 0 0;
+        }
+
+        .wave-bar {
+            width: 3px;
+            height: 12px;
+            border-radius: 999px;
+            background: var(--color-wave-1);
+            opacity: 0.5;
+        }
+
         @media (prefers-reduced-motion: reduce) {
 
             *,
@@ -398,7 +416,6 @@
             }
         }
 
-        /* ─── Mobile ─────────────────────────────────────────── */
         @media (max-width: 480px) {
             .app-wrap {
                 padding: var(--space-4) var(--space-3) var(--space-12);
@@ -411,29 +428,29 @@
             .button-row button {
                 width: 100%;
             }
+
+            .mic-cta {
+                width: 88px;
+                height: 88px;
+            }
         }
     </style>
 </head>
 
 <body>
     <div class="app-wrap">
-
-        <!-- Header -->
         <header class="app-header">
             <div class="app-logo">
                 <div class="app-logo-icon" aria-hidden="true">
-                    <!-- Mic SVG icon -->
                     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1.5 
-              13.93A7.001 7.001 0 0 1 5 8H3a9 9 0 0 0 8 8.94V20H8v2h8v-2h-3v-3.06A9 
-              9 0 0 0 21 8h-2a7 7 0 0 1-5.5 6.93z" />
+                        <path
+                            d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1.5 13.93A7.001 7.001 0 0 1 5 8H3a9 9 0 0 0 8 8.94V20H8v2h8v-2h-3v-3.06A9 9 0 0 0 21 8h-2a7 7 0 0 1-5.5 6.93z" />
                     </svg>
                 </div>
                 <span class="app-logo-name">DIY <span>Shazam</span></span>
             </div>
 
             <button class="theme-toggle" id="themeToggle" aria-label="Switch to light mode" title="Toggle theme">
-                <!-- Sun icon (shown in dark mode to switch to light) -->
                 <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5" />
@@ -446,7 +463,6 @@
                     <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
                     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
                 </svg>
-                <!-- Moon icon (shown in light mode to switch to dark) -->
                 <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
@@ -454,51 +470,73 @@
             </button>
         </header>
 
-        <!-- Hero -->
-        <div class="mt-4" style="margin-bottom: var(--space-8);">
-            <h1 class="page-title">Identify any song.</h1>
-            <p class="page-subtitle">Upload a WAV/MP3 file or record directly from your microphone.</p>
+        <div class="hero">
+            <div class="hero-copy">
+                <h1 class="page-title">Identify any song.</h1>
+                <p class="page-subtitle">Upload a WAV/MP3 file or record directly from your microphone.</p>
+            </div>
+
+            <div id="status" aria-live="polite" aria-label="Server status">Checking server status…</div>
+
+            <section class="panel cta-shell" aria-label="Music recognition controls">
+                <div class="mic-cta" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                            d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1.5 13.93A7.001 7.001 0 0 1 5 8H3a9 9 0 0 0 8 8.94V20H8v2h8v-2h-3v-3.06A9 9 0 0 0 21 8h-2a7 7 0 0 1-5.5 6.93z" />
+                    </svg>
+                </div>
+
+                <div class="waveform" aria-label="Waveform visualizer">
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                    <span class="wave-bar" data-wave-bar></span>
+                </div>
+
+                <label for="fileInput">File upload</label>
+                <input id="fileInput" type="file" accept="audio/*" />
+
+                <div class="button-row">
+                    <button id="uploadBtn">Upload &amp; Match</button>
+                    <button id="recBtn">Start Recording</button>
+                    <button id="stopBtn" disabled>Stop</button>
+                </div>
+            </section>
         </div>
 
-        <!-- Server status (dev info, monospace) -->
-        <section id="status" aria-live="polite" aria-label="Server status">
-            Checking server status…
-        </section>
-
-        <!-- Controls panel -->
-        <section class="panel stack" aria-label="Music recognition controls">
-            <label for="fileInput">File upload</label>
-            <input id="fileInput" type="file" accept="audio/*" />
-            <div class="button-row">
-                <button id="uploadBtn">Upload &amp; Match</button>
-            </div>
-
-            <hr />
-
-            <div class="button-row">
-                <button id="recBtn">Start Recording</button>
-                <button id="stopBtn" disabled>Stop</button>
-            </div>
-        </section>
-
-        <!-- Result -->
-        <section class="stack mt-6" aria-label="Recognition result" role="region">
+        <section class="stack" aria-label="Recognition result" role="region">
             <h2 class="section-heading">Result</h2>
             <div id="result"></div>
         </section>
+    </div>
 
-    </div><!-- /.app-wrap -->
-
-    <!-- Theme toggle logic (tiny, inline so no extra request) -->
     <script>
         (function () {
             const root = document.documentElement;
             const btn = document.getElementById('themeToggle');
             const STORE_KEY = 'shazam_theme';
-
-            // Apply saved preference immediately (avoids flash)
             const saved = localStorage.getItem(STORE_KEY);
-            if (saved === 'light') root.setAttribute('data-theme', 'light');
+            if (saved === 'light' || saved === 'dark') root.setAttribute('data-theme', saved);
 
             function updateLabel() {
                 const isDark = root.getAttribute('data-theme') === 'dark';
