@@ -4,8 +4,11 @@ const recBtn = document.getElementById('recBtn');
 const stopBtn = document.getElementById('stopBtn');
 const resultDiv = document.getElementById('result');
 const statusDiv = document.getElementById('status');
+
 let mediaRecorder;
 let chunks = [];
+let stopTimer = null;
+let mediaStream = null;
 
 async function refreshStatus() {
     try {
@@ -53,17 +56,21 @@ function renderResult(data) {
         resultDiv.innerText = 'No match found.';
         return;
     }
-    // matched
-    resultDiv.innerHTML = ``;
+
+    resultDiv.innerHTML = '';
     const title = document.createElement('div');
     title.textContent = `Song: ${data.title || '(unknown)'}`;
+
     const artist = document.createElement('div');
     artist.textContent = `Artist: ${data.artist || '(unknown)'}`;
+
     const album = document.createElement('div');
     album.textContent = `Album: ${data.album || '(unknown)'}`;
+
     resultDiv.appendChild(title);
     resultDiv.appendChild(artist);
     resultDiv.appendChild(album);
+
     if (data.image) {
         const img = document.createElement('img');
         img.src = data.image;
@@ -85,22 +92,56 @@ recBtn.addEventListener('click', async () => {
         resultDiv.innerText = 'Microphone not supported in this browser.';
         return;
     }
+
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        chunks = [];
+        mediaRecorder = new MediaRecorder(mediaStream);
+
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+
         mediaRecorder.onstop = async () => {
+            if (stopTimer) {
+                clearTimeout(stopTimer);
+                stopTimer = null;
+            }
+
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+
             const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
             chunks = [];
+
+            if (blob.size === 0) {
+                resultDiv.innerText = 'No audio recorded.';
+                return;
+            }
+
             const file = new File([blob], 'recording.webm', { type: blob.type });
             await postFile(file);
         };
+
         mediaRecorder.start(1000);
         recBtn.disabled = true;
         stopBtn.disabled = false;
-        resultDiv.innerText = 'Recording...';
+        resultDiv.innerText = 'Recording... (auto-stops after 10 seconds)';
+
+        stopTimer = setTimeout(() => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            recBtn.disabled = false;
+            stopBtn.disabled = true;
+            resultDiv.innerText = 'Recording stopped automatically after 10 seconds.';
+        }, 10000);
     } catch (err) {
         resultDiv.innerText = 'Microphone error: ' + err;
+        recBtn.disabled = false;
+        stopBtn.disabled = true;
     }
 });
 
