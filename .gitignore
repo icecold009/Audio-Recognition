@@ -3,7 +3,7 @@ __pycache__/
 *.py[codz]
 *$py.class
 
-rate-limit-usage.json
+artifacts/rate_limit_usage.json
 
 # C extensions
 *.so
