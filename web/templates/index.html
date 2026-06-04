@@ -6,51 +6,195 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>DIY Shazam - Web</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            color-scheme: light;
+            --bg: #f5f7fb;
+            --surface: #ffffff;
+            --surface-soft: #eef2f8;
+            --border: #d9e0ea;
+            --text: #111827;
+            --muted: #556070;
+            --accent: #0d8dd6;
+            --accent-hover: #0a73ae;
+        }
+
+        html {
+            font-size: 100%;
+        }
+
         body {
-            font-family: system-ui, sans-serif;
-            max-width: 760px;
-            margin: 24px auto;
-            padding: 0 12px;
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Arial, sans-serif;
+            font-size: clamp(1rem, 0.95rem + 0.25vw, 1.0625rem);
+            line-height: 1.5;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top, rgba(13, 141, 214, 0.12), transparent 38%),
+                linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+        }
+
+        .page {
+            width: min(100%, 760px);
+            margin: 0 auto;
+            padding: 24px 16px 32px;
         }
 
         h1 {
-            font-size: 1.4rem;
+            margin: 0 0 8px;
+            font-size: clamp(1.6rem, 1.1rem + 1.8vw, 2.5rem);
+            line-height: 1.1;
+        }
+
+        h2 {
+            margin: 0 0 12px;
+            font-size: clamp(1.1rem, 1rem + 0.6vw, 1.4rem);
+        }
+
+        p {
+            margin: 0 0 16px;
+            color: var(--muted);
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 12px 32px rgba(17, 24, 39, 0.06);
+        }
+
+        .stack {
+            display: grid;
+            gap: 12px;
+        }
+
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .button-row button,
+        button {
+            min-height: 44px;
         }
 
         button {
-            margin: 6px 0;
+            border: 0;
+            border-radius: 999px;
+            padding: 0.75rem 1.1rem;
+            font: inherit;
+            font-weight: 600;
+            color: white;
+            background: var(--accent);
+            cursor: pointer;
+            transition: transform 180ms ease, background 180ms ease, opacity 180ms ease;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        label {
+            display: grid;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--surface-soft);
+            font: inherit;
+        }
+
+        hr {
+            border: 0;
+            border-top: 1px solid var(--border);
+            margin: 20px 0;
+        }
+
+        #status {
+            padding: 12px;
+            border: 1px solid var(--border);
+            margin: 16px 0;
+            background: var(--surface-soft);
+            border-radius: 12px;
+            color: var(--muted);
         }
 
         #result img {
-            max-width: 300px;
+            max-width: 100%;
+            height: auto;
             display: block;
-            margin-top: 8px
+            margin-top: 12px;
+            border-radius: 12px;
+        }
+
+        #result {
+            display: grid;
+            gap: 6px;
+            word-break: break-word;
+        }
+
+        @media (max-width: 480px) {
+            .page {
+                padding: 16px 12px 24px;
+            }
+
+            .button-row {
+                flex-direction: column;
+            }
+
+            .button-row button {
+                width: 100%;
+            }
         }
     </style>
 </head>
 
 <body>
-    <h1>DIY Shazam - Web</h1>
-    <p>Upload a sound file (WAV/MP3) or record from your microphone.</p>
+    <main class="page">
+        <h1>DIY Shazam - Web</h1>
+        <p>Upload a sound file (WAV/MP3) or record from your microphone.</p>
 
-    <div id="status" style="padding:8px;border:1px solid #eee;margin:8px 0;background:#fafafa">
-        Checking server status...
-    </div>
+        <section id="status" aria-live="polite">
+            Checking server status...
+        </section>
 
-    <div>
-        <label>File upload: <input id="fileInput" type="file" accept="audio/*"></label>
-        <button id="uploadBtn">Upload & Match</button>
-    </div>
+        <section class="panel stack" aria-label="Music recognition controls">
+            <label for="fileInput">File upload</label>
+            <input id="fileInput" type="file" accept="audio/*">
+            <div class="button-row">
+                <button id="uploadBtn">Upload & Match</button>
+            </div>
 
-    <hr />
+            <hr />
 
-    <div>
-        <button id="recBtn">Start Recording</button>
-        <button id="stopBtn" disabled>Stop</button>
-    </div>
+            <div class="button-row">
+                <button id="recBtn">Start Recording</button>
+                <button id="stopBtn" disabled>Stop</button>
+            </div>
+        </section>
 
-    <h2>Result</h2>
-    <div id="result"></div>
+        <section class="stack" style="margin-top: 20px;">
+            <h2>Result</h2>
+            <div id="result"></div>
+        </section>
+    </main>
 
     <script src="/static/app.js"></script>
 </body>

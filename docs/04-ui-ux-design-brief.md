@@ -253,6 +253,18 @@ CSS:
 
 **Mobile-first.** The primary use case (hearing music in public) is on mobile. Desktop is secondary.
 
+### Web UI Implementation Rules
+
+The browser UI should follow these concrete responsive rules so it works cleanly on both laptops and phones:
+
+- Use `box-sizing: border-box` on all elements so controls stay inside their containers.
+- Use `clamp()` for page and component font sizes so text scales smoothly across screen sizes.
+- Set the result image to `max-width: 100%` so album art or preview images never overflow narrow screens.
+- Give primary buttons a `min-height: 44px` so they remain finger-tappable on touch devices.
+- Use an `@media (max-width: 480px)` block for mobile-only rules.
+- Make action buttons full-width on mobile so they are easier to tap than small inline buttons.
+- Keep the main content width fluid with a readable desktop max-width rather than a fixed-width layout.
+
 ---
 
 ## Accessibility
