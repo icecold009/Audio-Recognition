@@ -31,6 +31,91 @@ function addToHistory(item) {
     saveHistory(history.slice(0, 50));
 }
 
+function buildStreamingLink(title, artist) {
+    const q = encodeURIComponent(`${title || ''} ${artist || ''}`.trim());
+    return `https://open.spotify.com/search/${q}`;
+}
+
+function showDetailModal(item) {
+    const existing = document.getElementById('detail-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'detail-modal';
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.background = 'rgba(0,0,0,0.55)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.padding = '16px';
+    overlay.style.zIndex = '9999';
+
+    const modal = document.createElement('div');
+    modal.className = 'panel';
+    modal.style.width = 'min(100%, 520px)';
+    modal.style.maxHeight = '90vh';
+    modal.style.overflowY = 'auto';
+    modal.style.display = 'grid';
+    modal.style.gap = '12px';
+    modal.style.position = 'relative';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Close';
+    closeBtn.style.width = 'fit-content';
+    closeBtn.addEventListener('click', () => overlay.remove());
+
+    const heading = document.createElement('h2');
+    heading.textContent = 'Song Details';
+
+    const title = document.createElement('div');
+    title.textContent = `Title: ${item.title || '(unknown)'}`;
+
+    const artist = document.createElement('div');
+    artist.textContent = `Artist: ${item.artist || '(unknown)'}`;
+
+    const album = document.createElement('div');
+    album.textContent = `Album: ${item.album || '(unknown)'}`;
+
+    const genre = document.createElement('div');
+    genre.textContent = `Genre: ${item.genre || '(not available)'}`;
+
+    const releaseDate = document.createElement('div');
+    releaseDate.textContent = `Release Date: ${item.release_date || '(not available)'}`;
+
+    const link = document.createElement('a');
+    link.href = item.streaming_url || buildStreamingLink(item.title, item.artist);
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'Open in Spotify';
+
+    modal.appendChild(closeBtn);
+    modal.appendChild(heading);
+
+    if (item.image) {
+        const img = document.createElement('img');
+        img.src = item.image;
+        img.alt = item.title || 'Album art';
+        img.style.maxWidth = '220px';
+        img.style.borderRadius = '12px';
+        modal.appendChild(img);
+    }
+
+    modal.appendChild(title);
+    modal.appendChild(artist);
+    modal.appendChild(album);
+    modal.appendChild(genre);
+    modal.appendChild(releaseDate);
+    modal.appendChild(link);
+
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
+
+    document.body.appendChild(overlay);
+}
+
 function renderHistory() {
     const history = loadHistory();
     const existing = document.getElementById('history-section');
@@ -66,15 +151,20 @@ function renderHistory() {
             const album = document.createElement('div');
             album.textContent = `Album: ${item.album || '(unknown)'}`;
 
-            const year = document.createElement('div');
-            year.textContent = `Year: ${item.year || '(unknown)'}`;
-
             const time = document.createElement('div');
             time.textContent = `Recognized: ${new Date(item.timestamp).toLocaleString()}`;
 
+            const actions = document.createElement('div');
+            actions.style.display = 'flex';
+            actions.style.gap = '10px';
+            actions.style.flexWrap = 'wrap';
+
+            const viewBtn = document.createElement('button');
+            viewBtn.textContent = 'View Details';
+            viewBtn.addEventListener('click', () => showDetailModal(item));
+
             const delBtn = document.createElement('button');
             delBtn.textContent = 'Remove';
-            delBtn.style.width = 'fit-content';
             delBtn.addEventListener('click', () => {
                 const updated = loadHistory();
                 updated.splice(index, 1);
@@ -82,10 +172,12 @@ function renderHistory() {
                 renderHistory();
             });
 
+            actions.appendChild(viewBtn);
+            actions.appendChild(delBtn);
+
             card.appendChild(title);
             card.appendChild(artist);
             card.appendChild(album);
-            card.appendChild(year);
             card.appendChild(time);
 
             if (item.image) {
@@ -97,7 +189,7 @@ function renderHistory() {
                 card.appendChild(img);
             }
 
-            card.appendChild(delBtn);
+            card.appendChild(actions);
             section.appendChild(card);
         });
     }
@@ -181,13 +273,26 @@ function renderResult(data) {
     const album = document.createElement('div');
     album.textContent = `Album: ${data.album || '(unknown)'}`;
 
-    const year = document.createElement('div');
-    year.textContent = `Year: ${data.year || '(unknown)'}`;
+    const detailBtn = document.createElement('button');
+    detailBtn.textContent = 'View Details';
+    detailBtn.style.marginTop = '10px';
+
+    const item = {
+        title: data.title || '',
+        artist: data.artist || '',
+        album: data.album || '',
+        genre: data.genre || '',
+        release_date: data.release_date || '',
+        image: data.image || '',
+        streaming_url: data.streaming_url || buildStreamingLink(data.title, data.artist),
+        timestamp: Date.now()
+    };
+
+    detailBtn.addEventListener('click', () => showDetailModal(item));
 
     resultDiv.appendChild(title);
     resultDiv.appendChild(artist);
     resultDiv.appendChild(album);
-    resultDiv.appendChild(year);
 
     if (data.image) {
         const img = document.createElement('img');
@@ -196,15 +301,9 @@ function renderResult(data) {
         resultDiv.appendChild(img);
     }
 
-    addToHistory({
-        title: data.title || '',
-        artist: data.artist || '',
-        album: data.album || '',
-        year: data.year || '',
-        image: data.image || '',
-        timestamp: Date.now()
-    });
+    resultDiv.appendChild(detailBtn);
 
+    addToHistory(item);
     renderHistory();
 }
 
