@@ -207,6 +207,7 @@ body {
     border-radius: var(--radius-xl);
     padding: var(--space-6);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    transition: background 250ms ease, border-color 250ms ease;
 }
 
 .stack {
@@ -295,8 +296,58 @@ button:focus-visible {
 
 .button-row {
     display: flex;
-    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
     gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-top: var(--space-2);
+}
+
+.upload-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-3);
+    align-items: center;
+}
+
+.upload-row #fileInput {
+    width: 100%;
+}
+
+.upload-row #uploadBtn {
+    padding: 0.55rem 0.9rem;
+    font-size: 0.88rem;
+    min-height: 40px;
+    background: #17304a;
+    border: 1px solid #264a70;
+    white-space: nowrap;
+}
+
+.upload-row #uploadBtn:hover:not(:disabled) {
+    background: #1d3b5c;
+    border-color: #325f8e;
+}
+
+#recBtn,
+#stopBtn {
+    padding: 0.95rem 1.35rem;
+    font-size: 1rem;
+    min-height: 50px;
+    background: #102846;
+    border: 1px solid #1c3f67;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+}
+
+#recBtn:hover:not(:disabled),
+#stopBtn:hover:not(:disabled) {
+    background: #16365b;
+    border-color: #2a5688;
+}
+
+#stopBtn:disabled {
+    background: #0d1a2b;
+    border-color: #1a2d46;
+    opacity: 0.5;
 }
 
 #status {
@@ -311,7 +362,7 @@ button:focus-visible {
     line-height: 1.7;
 }
 
-.result-card {
+#result {
     display: grid;
     gap: var(--space-2);
     word-break: break-word;
@@ -321,7 +372,7 @@ button:focus-visible {
     text-align: center;
 }
 
-.result-card img {
+#result img {
     max-width: 260px;
     width: 100%;
     height: auto;
@@ -382,6 +433,30 @@ button:focus-visible {
     opacity: 0.5;
 }
 
+.site-footer {
+    margin-top: var(--space-12);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--color-divider);
+    text-align: center;
+    display: grid;
+    gap: var(--space-2);
+}
+
+.footer-name {
+    font-family: 'Sora', sans-serif;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.footer-bio {
+    max-width: 520px;
+    margin: 0 auto;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    line-height: 1.6;
+}
+
 @media (prefers-reduced-motion: reduce) {
 
     *,
@@ -402,6 +477,14 @@ button:focus-visible {
     }
 
     .button-row button {
+        width: 100%;
+    }
+
+    .upload-row {
+        grid-template-columns: 1fr;
+    }
+
+    .upload-row #uploadBtn {
         width: 100%;
     }
 

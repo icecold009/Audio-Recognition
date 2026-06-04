@@ -92,10 +92,13 @@
                 </div>
 
                 <label for="fileInput">File upload</label>
-                <input id="fileInput" type="file" accept="audio/*" />
+
+                <div class="upload-row">
+                    <input id="fileInput" type="file" accept="audio/*" />
+                    <button id="uploadBtn">Upload &amp; Match</button>
+                </div>
 
                 <div class="button-row">
-                    <button id="uploadBtn">Upload &amp; Match</button>
                     <button id="recBtn">Start Recording</button>
                     <button id="stopBtn" disabled>Stop</button>
                 </div>
@@ -104,8 +107,15 @@
 
         <section class="stack" aria-label="Recognition result" role="region">
             <h2 class="section-heading">Result</h2>
-            <div id="result" class="result-card"></div>
+            <div id="result"></div>
         </section>
+
+        <footer class="site-footer">
+            <p class="footer-name">Made by Shaurya Saria</p>
+            <p class="footer-bio">
+                Computer science student building web apps, data-driven tools, and AI projects.
+            </p>
+        </footer>
     </div>
 
     <script>
