@@ -9,6 +9,7 @@ let mediaRecorder;
 let chunks = [];
 let stopTimer = null;
 let mediaStream = null;
+let lastFile = null;
 
 const HISTORY_KEY = 'shazam_guest_history';
 
@@ -42,7 +43,6 @@ function renderHistory() {
 
     const h2 = document.createElement('h2');
     h2.textContent = 'History';
-
     section.appendChild(h2);
 
     if (!history.length) {
@@ -63,6 +63,12 @@ function renderHistory() {
             const artist = document.createElement('div');
             artist.textContent = `Artist: ${item.artist || '(unknown)'}`;
 
+            const album = document.createElement('div');
+            album.textContent = `Album: ${item.album || '(unknown)'}`;
+
+            const year = document.createElement('div');
+            year.textContent = `Year: ${item.year || '(unknown)'}`;
+
             const time = document.createElement('div');
             time.textContent = `Recognized: ${new Date(item.timestamp).toLocaleString()}`;
 
@@ -78,8 +84,9 @@ function renderHistory() {
 
             card.appendChild(title);
             card.appendChild(artist);
+            card.appendChild(album);
+            card.appendChild(year);
             card.appendChild(time);
-            card.appendChild(delBtn);
 
             if (item.image) {
                 const img = document.createElement('img');
@@ -90,6 +97,7 @@ function renderHistory() {
                 card.appendChild(img);
             }
 
+            card.appendChild(delBtn);
             section.appendChild(card);
         });
     }
@@ -114,7 +122,19 @@ async function refreshStatus() {
 refreshStatus();
 renderHistory();
 
+function renderRetryButton() {
+    const retryBtn = document.createElement('button');
+    retryBtn.textContent = 'Retry';
+    retryBtn.style.marginTop = '10px';
+    retryBtn.addEventListener('click', () => {
+        if (lastFile) postFile(lastFile);
+        else resultDiv.innerText = 'Nothing to retry yet.';
+    });
+    resultDiv.appendChild(retryBtn);
+}
+
 async function postFile(file) {
+    lastFile = file;
     const fd = new FormData();
     fd.append('file', file, file.name || 'upload.audio');
     resultDiv.innerText = 'Uploading...';
@@ -124,28 +144,34 @@ async function postFile(file) {
         renderResult(data);
     } catch (err) {
         resultDiv.innerText = 'Upload error: ' + err;
+        renderRetryButton();
     }
 }
 
 function renderResult(data) {
     if (!data) {
         resultDiv.innerText = 'No response';
+        renderRetryButton();
         return;
     }
     if (data.status === 'no_token') {
         resultDiv.innerText = 'Server: AUDD token not configured.';
+        renderRetryButton();
         return;
     }
     if (data.status === 'error') {
         resultDiv.innerText = 'Server error: ' + (data.error || 'unknown');
+        renderRetryButton();
         return;
     }
     if (data.status === 'no_match') {
         resultDiv.innerText = 'No match found.';
+        renderRetryButton();
         return;
     }
 
     resultDiv.innerHTML = '';
+
     const title = document.createElement('div');
     title.textContent = `Song: ${data.title || '(unknown)'}`;
 
@@ -155,13 +181,18 @@ function renderResult(data) {
     const album = document.createElement('div');
     album.textContent = `Album: ${data.album || '(unknown)'}`;
 
+    const year = document.createElement('div');
+    year.textContent = `Year: ${data.year || '(unknown)'}`;
+
     resultDiv.appendChild(title);
     resultDiv.appendChild(artist);
     resultDiv.appendChild(album);
+    resultDiv.appendChild(year);
 
     if (data.image) {
         const img = document.createElement('img');
         img.src = data.image;
+        img.alt = data.title || 'Album art';
         resultDiv.appendChild(img);
     }
 
@@ -169,9 +200,11 @@ function renderResult(data) {
         title: data.title || '',
         artist: data.artist || '',
         album: data.album || '',
+        year: data.year || '',
         image: data.image || '',
         timestamp: Date.now()
     });
+
     renderHistory();
 }
 
@@ -187,6 +220,7 @@ uploadBtn.addEventListener('click', () => {
 recBtn.addEventListener('click', async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         resultDiv.innerText = 'Microphone not supported in this browser.';
+        renderRetryButton();
         return;
     }
 
@@ -215,6 +249,7 @@ recBtn.addEventListener('click', async () => {
 
             if (blob.size === 0) {
                 resultDiv.innerText = 'No audio recorded.';
+                renderRetryButton();
                 return;
             }
 
@@ -237,6 +272,7 @@ recBtn.addEventListener('click', async () => {
         }, 10000);
     } catch (err) {
         resultDiv.innerText = 'Microphone error: ' + err;
+        renderRetryButton();
         recBtn.disabled = false;
         stopBtn.disabled = true;
     }
