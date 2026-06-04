@@ -10,6 +10,93 @@ let chunks = [];
 let stopTimer = null;
 let mediaStream = null;
 
+const HISTORY_KEY = 'shazam_guest_history';
+
+function loadHistory() {
+    try {
+        return JSON.parse(sessionStorage.getItem(HISTORY_KEY) || '[]');
+    } catch {
+        return [];
+    }
+}
+
+function saveHistory(history) {
+    sessionStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
+function addToHistory(item) {
+    const history = loadHistory();
+    history.unshift(item);
+    saveHistory(history.slice(0, 50));
+}
+
+function renderHistory() {
+    const history = loadHistory();
+    const existing = document.getElementById('history-section');
+    if (existing) existing.remove();
+
+    const section = document.createElement('section');
+    section.id = 'history-section';
+    section.className = 'stack';
+    section.style.marginTop = '20px';
+
+    const h2 = document.createElement('h2');
+    h2.textContent = 'History';
+
+    section.appendChild(h2);
+
+    if (!history.length) {
+        const empty = document.createElement('div');
+        empty.textContent = 'No history yet.';
+        section.appendChild(empty);
+    } else {
+        history.forEach((item, index) => {
+            const card = document.createElement('div');
+            card.className = 'panel';
+            card.style.display = 'grid';
+            card.style.gap = '6px';
+            card.style.marginBottom = '12px';
+
+            const title = document.createElement('div');
+            title.textContent = `Song: ${item.title || '(unknown)'}`;
+
+            const artist = document.createElement('div');
+            artist.textContent = `Artist: ${item.artist || '(unknown)'}`;
+
+            const time = document.createElement('div');
+            time.textContent = `Recognized: ${new Date(item.timestamp).toLocaleString()}`;
+
+            const delBtn = document.createElement('button');
+            delBtn.textContent = 'Remove';
+            delBtn.style.width = 'fit-content';
+            delBtn.addEventListener('click', () => {
+                const updated = loadHistory();
+                updated.splice(index, 1);
+                saveHistory(updated);
+                renderHistory();
+            });
+
+            card.appendChild(title);
+            card.appendChild(artist);
+            card.appendChild(time);
+            card.appendChild(delBtn);
+
+            if (item.image) {
+                const img = document.createElement('img');
+                img.src = item.image;
+                img.alt = item.title || 'Album art';
+                img.style.maxWidth = '120px';
+                img.style.borderRadius = '12px';
+                card.appendChild(img);
+            }
+
+            section.appendChild(card);
+        });
+    }
+
+    document.querySelector('.page').appendChild(section);
+}
+
 async function refreshStatus() {
     try {
         const res = await fetch('/api/status');
@@ -25,6 +112,7 @@ async function refreshStatus() {
 }
 
 refreshStatus();
+renderHistory();
 
 async function postFile(file) {
     const fd = new FormData();
@@ -76,6 +164,15 @@ function renderResult(data) {
         img.src = data.image;
         resultDiv.appendChild(img);
     }
+
+    addToHistory({
+        title: data.title || '',
+        artist: data.artist || '',
+        album: data.album || '',
+        image: data.image || '',
+        timestamp: Date.now()
+    });
+    renderHistory();
 }
 
 uploadBtn.addEventListener('click', () => {
