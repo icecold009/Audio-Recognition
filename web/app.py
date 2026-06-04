@@ -19,7 +19,7 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 
 RATE_LIMIT_FILE = Path("artifacts/rate_limit_usage.json")
 COOLDOWN_SECONDS = 30
-DAILY_LIMIT = 20
+DAILY_LIMIT = 25
 MONTHLY_LIMIT = 450
 
 last_request_by_ip: dict[str, float] = {}
