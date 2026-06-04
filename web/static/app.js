@@ -9,11 +9,25 @@ let mediaRecorder;
 let chunks = [];
 let stopTimer = null;
 let mediaStream = null;
+let audioContext = null;
+let analyser = null;
+let sourceNode = null;
+let animationFrameId = null;
 let lastFile = null;
 let isSubmitting = false;
+let isListening = false;
+let isProcessing = false;
 
 const HISTORY_KEY = 'shazam_guest_history';
 const SAVE_HISTORY_KEY = 'shazam_save_history_enabled';
+
+function setThemeFromStorage() {
+    const root = document.documentElement;
+    const saved = localStorage.getItem('shazam_theme');
+    if (saved === 'light' || saved === 'dark') {
+        root.setAttribute('data-theme', saved);
+    }
+}
 
 function isHistoryEnabled() {
     const raw = sessionStorage.getItem(SAVE_HISTORY_KEY);
@@ -52,11 +66,91 @@ function buildStreamingLink(title, artist) {
     return `https://open.spotify.com/search/${q}`;
 }
 
+function setMicLabel() {
+    if (recBtn) {
+        recBtn.textContent = isProcessing ? 'Identifying…' : (isListening ? 'Listening…' : 'Start Recording');
+        recBtn.setAttribute(
+            'aria-label',
+            isProcessing ? 'Identifying song' : (isListening ? 'Stop listening' : 'Identify song')
+        );
+    }
+    if (stopBtn) {
+        stopBtn.setAttribute('aria-label', 'Stop recording');
+    }
+}
+
 function setSubmittingState(loading) {
     isSubmitting = loading;
-    uploadBtn.disabled = loading;
+    isProcessing = loading;
+    uploadBtn.disabled = loading || isListening;
     recBtn.disabled = loading || (mediaRecorder && mediaRecorder.state !== 'inactive');
     stopBtn.disabled = !loading && (!mediaRecorder || mediaRecorder.state === 'inactive');
+    setMicLabel();
+}
+
+function setListeningState(active) {
+    isListening = active;
+    if (active) {
+        recBtn.disabled = true;
+        stopBtn.disabled = false;
+    } else {
+        recBtn.disabled = false;
+        stopBtn.disabled = true;
+    }
+    setMicLabel();
+}
+
+function ensureVisualizerNode(stream) {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        sourceNode = audioContext.createMediaStreamSource(stream);
+        sourceNode.connect(analyser);
+    } catch {
+        audioContext = null;
+        analyser = null;
+        sourceNode = null;
+    }
+}
+
+function stopVisualizer() {
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+    if (sourceNode) {
+        try { sourceNode.disconnect(); } catch { }
+    }
+    if (analyser) {
+        try { analyser.disconnect(); } catch { }
+    }
+    if (audioContext && audioContext.state !== 'closed') {
+        audioContext.close().catch(() => { });
+    }
+    audioContext = null;
+    analyser = null;
+    sourceNode = null;
+}
+
+function startVisualizerLoop() {
+    const bars = Array.from(document.querySelectorAll('[data-wave-bar]'));
+    if (!bars.length || !analyser) return;
+
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const draw = () => {
+        animationFrameId = requestAnimationFrame(draw);
+        analyser.getByteFrequencyData(dataArray);
+
+        for (let i = 0; i < bars.length; i++) {
+            const value = dataArray[Math.floor((i / bars.length) * bufferLength)] || 0;
+            const height = Math.max(6, Math.round((value / 255) * 64));
+            bars[i].style.height = `${height}px`;
+            bars[i].style.opacity = String(0.35 + (value / 255) * 0.65);
+        }
+    };
+
+    draw();
 }
 
 function showDetailModal(item) {
@@ -181,7 +275,7 @@ function renderSettings() {
     section.appendChild(label);
     section.appendChild(note);
 
-    document.querySelector('.page').appendChild(section);
+    document.querySelector('.app-wrap').appendChild(section);
 }
 
 function renderHistory() {
@@ -195,6 +289,7 @@ function renderHistory() {
     section.style.marginTop = '20px';
 
     const h2 = document.createElement('h2');
+    h2.className = 'section-heading';
     h2.textContent = 'History';
     section.appendChild(h2);
 
@@ -266,14 +361,14 @@ function renderHistory() {
         });
     }
 
-    document.querySelector('.page').appendChild(section);
+    document.querySelector('.app-wrap').appendChild(section);
 }
 
 async function refreshStatus() {
     try {
         const res = await fetch('/api/status');
         const s = await res.json();
-        statusDiv.innerHTML =
+        statusDiv.textContent =
             `AcoustID: ${s.acoustid_configured ? 'configured' : 'not configured'}; ` +
             `fpcalc on PATH: ${s.fpcalc_on_path ? 'yes' : 'no'}; ` +
             `FP_CALC_PATH exists: ${s.fpcalc_path_exists ? 'yes' : 'no'}; ` +
@@ -286,10 +381,6 @@ async function refreshStatus() {
         statusDiv.innerText = 'Failed to fetch status: ' + err;
     }
 }
-
-refreshStatus();
-renderSettings();
-renderHistory();
 
 function renderRetryButton() {
     const retryBtn = document.createElement('button');
@@ -397,6 +488,12 @@ function renderResult(data) {
     renderHistory();
 }
 
+refreshStatus();
+setThemeFromStorage();
+renderSettings();
+renderHistory();
+setMicLabel();
+
 uploadBtn.addEventListener('click', () => {
     const f = fileInput.files[0];
     if (!f) {
@@ -407,7 +504,7 @@ uploadBtn.addEventListener('click', () => {
 });
 
 recBtn.addEventListener('click', async () => {
-    if (isSubmitting) return;
+    if (isSubmitting || isListening) return;
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         resultDiv.innerText = 'Microphone not supported in this browser.';
@@ -419,6 +516,9 @@ recBtn.addEventListener('click', async () => {
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         chunks = [];
         mediaRecorder = new MediaRecorder(mediaStream);
+
+        ensureVisualizerNode(mediaStream);
+        startVisualizerLoop();
 
         mediaRecorder.ondataavailable = (e) => {
             if (e.data && e.data.size > 0) chunks.push(e.data);
@@ -435,6 +535,11 @@ recBtn.addEventListener('click', async () => {
                 mediaStream = null;
             }
 
+            stopVisualizer();
+            setListeningState(false);
+            isProcessing = true;
+            setMicLabel();
+
             const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
             chunks = [];
 
@@ -443,18 +548,21 @@ recBtn.addEventListener('click', async () => {
                 renderRetryButton();
                 recBtn.disabled = false;
                 stopBtn.disabled = true;
+                isProcessing = false;
+                setMicLabel();
                 return;
             }
 
             const file = new File([blob], 'recording.webm', { type: blob.type });
-            recBtn.disabled = false;
+            recBtn.disabled = true;
             stopBtn.disabled = true;
             await postFile(file);
+            isProcessing = false;
+            setMicLabel();
         };
 
         mediaRecorder.start(1000);
-        recBtn.disabled = true;
-        stopBtn.disabled = false;
+        setListeningState(true);
         resultDiv.innerText = 'Recording... (auto-stops after 10 seconds)';
 
         stopTimer = setTimeout(() => {
@@ -466,6 +574,8 @@ recBtn.addEventListener('click', async () => {
             resultDiv.innerText = 'Recording stopped automatically after 10 seconds.';
         }, 10000);
     } catch (err) {
+        stopVisualizer();
+        setListeningState(false);
         resultDiv.innerText = 'Microphone error: ' + err;
         renderRetryButton();
         recBtn.disabled = false;
@@ -476,7 +586,7 @@ recBtn.addEventListener('click', async () => {
 stopBtn.addEventListener('click', () => {
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
-        recBtn.disabled = false;
+        recBtn.disabled = true;
         stopBtn.disabled = true;
     }
 });
