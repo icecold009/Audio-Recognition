@@ -12,6 +12,16 @@ let mediaStream = null;
 let lastFile = null;
 
 const HISTORY_KEY = 'shazam_guest_history';
+const SAVE_HISTORY_KEY = 'shazam_save_history_enabled';
+
+function isHistoryEnabled() {
+    const raw = sessionStorage.getItem(SAVE_HISTORY_KEY);
+    return raw === null ? true : raw === 'true';
+}
+
+function setHistoryEnabled(value) {
+    sessionStorage.setItem(SAVE_HISTORY_KEY, String(value));
+}
 
 function loadHistory() {
     try {
@@ -25,7 +35,12 @@ function saveHistory(history) {
     sessionStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 }
 
+function clearHistory() {
+    sessionStorage.removeItem(HISTORY_KEY);
+}
+
 function addToHistory(item) {
+    if (!isHistoryEnabled()) return;
     const history = loadHistory();
     history.unshift(item);
     saveHistory(history.slice(0, 50));
@@ -58,7 +73,6 @@ function showDetailModal(item) {
     modal.style.overflowY = 'auto';
     modal.style.display = 'grid';
     modal.style.gap = '12px';
-    modal.style.position = 'relative';
 
     const closeBtn = document.createElement('button');
     closeBtn.textContent = 'Close';
@@ -116,6 +130,52 @@ function showDetailModal(item) {
     document.body.appendChild(overlay);
 }
 
+function renderSettings() {
+    const existing = document.getElementById('settings-section');
+    if (existing) existing.remove();
+
+    const section = document.createElement('section');
+    section.id = 'settings-section';
+    section.className = 'panel stack';
+    section.style.marginTop = '20px';
+
+    const heading = document.createElement('h2');
+    heading.textContent = 'Privacy';
+
+    const label = document.createElement('label');
+    label.style.display = 'flex';
+    label.style.alignItems = 'center';
+    label.style.gap = '10px';
+    label.style.fontWeight = '600';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = isHistoryEnabled();
+
+    const text = document.createElement('span');
+    text.textContent = 'Save history in this session';
+
+    checkbox.addEventListener('change', () => {
+        setHistoryEnabled(checkbox.checked);
+        if (!checkbox.checked) {
+            clearHistory();
+        }
+        renderHistory();
+    });
+
+    label.appendChild(checkbox);
+    label.appendChild(text);
+
+    const note = document.createElement('div');
+    note.textContent = 'When off, recognized songs will not be stored in session history.';
+
+    section.appendChild(heading);
+    section.appendChild(label);
+    section.appendChild(note);
+
+    document.querySelector('.page').appendChild(section);
+}
+
 function renderHistory() {
     const history = loadHistory();
     const existing = document.getElementById('history-section');
@@ -130,7 +190,11 @@ function renderHistory() {
     h2.textContent = 'History';
     section.appendChild(h2);
 
-    if (!history.length) {
+    if (!isHistoryEnabled()) {
+        const disabled = document.createElement('div');
+        disabled.textContent = 'History is turned off for this session.';
+        section.appendChild(disabled);
+    } else if (!history.length) {
         const empty = document.createElement('div');
         empty.textContent = 'No history yet.';
         section.appendChild(empty);
@@ -212,6 +276,7 @@ async function refreshStatus() {
 }
 
 refreshStatus();
+renderSettings();
 renderHistory();
 
 function renderRetryButton() {
