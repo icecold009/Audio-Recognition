@@ -10,6 +10,7 @@ let chunks = [];
 let stopTimer = null;
 let mediaStream = null;
 let lastFile = null;
+let isSubmitting = false;
 
 const HISTORY_KEY = 'shazam_guest_history';
 const SAVE_HISTORY_KEY = 'shazam_save_history_enabled';
@@ -49,6 +50,13 @@ function addToHistory(item) {
 function buildStreamingLink(title, artist) {
     const q = encodeURIComponent(`${title || ''} ${artist || ''}`.trim());
     return `https://open.spotify.com/search/${q}`;
+}
+
+function setSubmittingState(loading) {
+    isSubmitting = loading;
+    uploadBtn.disabled = loading;
+    recBtn.disabled = loading || (mediaRecorder && mediaRecorder.state !== 'inactive');
+    stopBtn.disabled = !loading && (!mediaRecorder || mediaRecorder.state === 'inactive');
 }
 
 function showDetailModal(item) {
@@ -265,11 +273,15 @@ async function refreshStatus() {
     try {
         const res = await fetch('/api/status');
         const s = await res.json();
-        statusDiv.innerHTML = `AcoustID: ${s.acoustid_configured ? 'configured' : 'not configured'}; ` +
+        statusDiv.innerHTML =
+            `AcoustID: ${s.acoustid_configured ? 'configured' : 'not configured'}; ` +
             `fpcalc on PATH: ${s.fpcalc_on_path ? 'yes' : 'no'}; ` +
             `FP_CALC_PATH exists: ${s.fpcalc_path_exists ? 'yes' : 'no'}; ` +
             `ffmpeg on PATH: ${s.ffmpeg_on_path ? 'yes' : 'no'}; ` +
-            `AudD token: ${s.audd_configured ? 'configured' : 'not configured'}`;
+            `AudD token: ${s.audd_configured ? 'configured' : 'not configured'}; ` +
+            `Daily: ${s.daily_used}/${s.daily_limit}; ` +
+            `Monthly: ${s.monthly_used}/${s.monthly_limit}; ` +
+            `Cooldown: ${s.cooldown_seconds}s`;
     } catch (err) {
         statusDiv.innerText = 'Failed to fetch status: ' + err;
     }
@@ -283,6 +295,7 @@ function renderRetryButton() {
     const retryBtn = document.createElement('button');
     retryBtn.textContent = 'Retry';
     retryBtn.style.marginTop = '10px';
+    retryBtn.disabled = isSubmitting;
     retryBtn.addEventListener('click', () => {
         if (lastFile) postFile(lastFile);
         else resultDiv.innerText = 'Nothing to retry yet.';
@@ -291,17 +304,25 @@ function renderRetryButton() {
 }
 
 async function postFile(file) {
+    if (isSubmitting) return;
+
     lastFile = file;
+    setSubmittingState(true);
+
     const fd = new FormData();
     fd.append('file', file, file.name || 'upload.audio');
     resultDiv.innerText = 'Uploading...';
+
     try {
         const res = await fetch('/api/match', { method: 'POST', body: fd });
         const data = await res.json();
         renderResult(data);
+        await refreshStatus();
     } catch (err) {
         resultDiv.innerText = 'Upload error: ' + err;
         renderRetryButton();
+    } finally {
+        setSubmittingState(false);
     }
 }
 
@@ -309,6 +330,10 @@ function renderResult(data) {
     if (!data) {
         resultDiv.innerText = 'No response';
         renderRetryButton();
+        return;
+    }
+    if (data.status === 'rate_limited') {
+        resultDiv.innerText = data.error || 'Too many requests. Please wait and try again.';
         return;
     }
     if (data.status === 'no_token') {
@@ -382,6 +407,8 @@ uploadBtn.addEventListener('click', () => {
 });
 
 recBtn.addEventListener('click', async () => {
+    if (isSubmitting) return;
+
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         resultDiv.innerText = 'Microphone not supported in this browser.';
         renderRetryButton();
@@ -414,10 +441,14 @@ recBtn.addEventListener('click', async () => {
             if (blob.size === 0) {
                 resultDiv.innerText = 'No audio recorded.';
                 renderRetryButton();
+                recBtn.disabled = false;
+                stopBtn.disabled = true;
                 return;
             }
 
             const file = new File([blob], 'recording.webm', { type: blob.type });
+            recBtn.disabled = false;
+            stopBtn.disabled = true;
             await postFile(file);
         };
 
