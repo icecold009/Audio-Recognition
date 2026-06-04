@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 artifacts/rate_limit_usage.json
+artifacts/*.json
 
 # C extensions
 *.so
