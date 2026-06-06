@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from flask_cors import CORS
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from shazam_project.config import load_config
 from shazam_project.recorder import load_audio_file
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+CORS(app, origins=["http://localhost:5173"])
 
 RATE_LIMIT_FILE = Path("artifacts/rate_limit_usage.json")
 COOLDOWN_SECONDS = 30
