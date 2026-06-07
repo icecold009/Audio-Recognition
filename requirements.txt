@@ -8,3 +8,5 @@ Pillow
 Flask
 werkzeug
 python-dotenv
+flask-cors
+supabase

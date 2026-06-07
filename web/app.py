@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
+from supabase import create_client, Client
 
 from shazam_project import matcher
 from shazam_project.config import load_config
@@ -19,13 +20,20 @@ from shazam_project.recorder import load_audio_file
 app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS(app, origins=["http://localhost:5173"])
 
-RATE_LIMIT_FILE = Path("artifacts/rate_limit_usage.json")
+# --- Config from env vars ---
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+DAILY_LIMIT = int(os.getenv("DAILY_LIMIT", "15"))
+MONTHLY_LIMIT = int(os.getenv("MONTHLY_LIMIT", "475"))
+INTERNAL_API_SECRET = os.getenv("INTERNAL_API_SECRET", "")
 COOLDOWN_SECONDS = 30
-DAILY_LIMIT = 15
-MONTHLY_LIMIT = 450
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 last_request_by_ip: dict[str, float] = {}
 
+
+# --- Helpers ---
 
 def _safe_unlink(path: str | None) -> None:
     if not path:
@@ -42,25 +50,31 @@ def _utc_now() -> datetime:
 
 
 def _today_key() -> str:
-    return _utc_now().strftime("%Y-%m-%d")
+    return "daily:" + _utc_now().strftime("%Y-%m-%d")
 
 
 def _month_key() -> str:
-    return _utc_now().strftime("%Y-%m")
+    return "monthly:" + _utc_now().strftime("%Y-%m")
 
 
-def _load_usage() -> dict:
-    if not RATE_LIMIT_FILE.exists():
-        return {"daily": {}, "monthly": {}}
+def _get_count(key: str) -> int:
     try:
-        return json.loads(RATE_LIMIT_FILE.read_text(encoding="utf-8"))
+        res = supabase.table("api_usage").select("call_count").eq("key", key).execute()
+        if res.data:
+            row = res.data[0]
+            if isinstance(row, dict):
+                return int(row.get("call_count", 0))  # type: ignore
+        return 0
     except Exception:
-        return {"daily": {}, "monthly": {}}
+        return 0
 
 
-def _save_usage(data: dict) -> None:
-    RATE_LIMIT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    RATE_LIMIT_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+def _increment_count(key: str) -> None:
+    try:
+        current = _get_count(key)
+        supabase.table("api_usage").upsert({"key": key, "call_count": current + 1}).execute()
+    except Exception:
+        pass
 
 
 def _get_client_ip() -> str:
@@ -86,12 +100,11 @@ def _check_rate_limits(ip: str) -> dict:
                 }
             }
 
-    usage = _load_usage()
     today = _today_key()
     month = _month_key()
 
-    daily_count = usage["daily"].get(today, 0)
-    monthly_count = usage["monthly"].get(month, 0)
+    daily_count = _get_count(today)
+    monthly_count = _get_count(month)
 
     if daily_count >= DAILY_LIMIT:
         return {
@@ -115,19 +128,19 @@ def _check_rate_limits(ip: str) -> dict:
 
     return {
         "blocked": False,
-        "usage": usage,
         "today": today,
         "month": month,
         "now": now,
     }
 
 
-def _record_request(ip: str, usage: dict, today: str, month: str, now: float) -> None:
+def _record_request(ip: str, today: str, month: str, now: float) -> None:
     last_request_by_ip[ip] = now
-    usage["daily"][today] = usage["daily"].get(today, 0) + 1
-    usage["monthly"][month] = usage["monthly"].get(month, 0) + 1
-    _save_usage(usage)
+    _increment_count(today)
+    _increment_count(month)
 
+
+# --- Routes ---
 
 @app.route("/")
 def index():
@@ -136,6 +149,10 @@ def index():
 
 @app.route("/api/match", methods=["POST"])
 def api_match():
+    # Secret header check
+    if INTERNAL_API_SECRET and request.headers.get("X-API-Secret") != INTERNAL_API_SECRET:
+        return jsonify({"status": "error", "error": "Unauthorized"}), 401
+
     cfg = load_config()
 
     if "file" not in request.files:
@@ -176,13 +193,7 @@ def api_match():
         except Exception as e:
             return jsonify({"status": "error", "error": f"Failed to load audio: {e}"}), 400
 
-        _record_request(
-            ip,
-            limit_check["usage"],
-            limit_check["today"],
-            limit_check["month"],
-            limit_check["now"],
-        )
+        _record_request(ip, limit_check["today"], limit_check["month"], limit_check["now"])
 
         result = matcher.match_audio(clip, cfg)
         return jsonify(result)
@@ -212,7 +223,6 @@ def api_status():
 
     ffmpeg_on_path = shutil.which("ffmpeg") is not None
 
-    usage = _load_usage()
     today = _today_key()
     month = _month_key()
 
@@ -223,9 +233,9 @@ def api_status():
             "fpcalc_on_path": fpcalc_on_path,
             "fpcalc_path_exists": fpcalc_path_exists,
             "ffmpeg_on_path": ffmpeg_on_path,
-            "daily_used": usage["daily"].get(today, 0),
+            "daily_used": _get_count(today),
             "daily_limit": DAILY_LIMIT,
-            "monthly_used": usage["monthly"].get(month, 0),
+            "monthly_used": _get_count(month),
             "monthly_limit": MONTHLY_LIMIT,
             "cooldown_seconds": COOLDOWN_SECONDS,
         }
