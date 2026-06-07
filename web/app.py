@@ -69,18 +69,21 @@ def _get_count(key: str) -> int:
         return 0
 
 
+# NEW — atomic, no race condition
 def _increment_count(key: str) -> None:
     try:
-        current = _get_count(key)
-        supabase.table("api_usage").upsert({"key": key, "call_count": current + 1}).execute()
+        supabase.rpc("increment_api_usage", {"p_key": key}).execute()
     except Exception:
         pass
 
 
+TRUSTED_PROXIES = {"127.0.0.1", "::1"}  # add your reverse proxy IP if deploying
+
 def _get_client_ip() -> str:
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    if request.remote_addr in TRUSTED_PROXIES:
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
     return request.remote_addr or "unknown"
 
 
