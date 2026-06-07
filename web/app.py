@@ -73,8 +73,8 @@ def _get_count(key: str) -> int:
 def _increment_count(key: str) -> None:
     try:
         supabase.rpc("increment_api_usage", {"p_key": key}).execute()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"INCREMENT ERROR: {e}")  # ← add this line
 
 
 TRUSTED_PROXIES = {"127.0.0.1", "::1"}  # add your reverse proxy IP if deploying
