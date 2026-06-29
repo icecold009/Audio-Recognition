@@ -125,7 +125,9 @@ Artist:  The Weeknd
 
 FFT spectrum for a sample clip:
 
+![FFT spectrum output](docs/screenshots/fft-output.png)
 
+![Web UI — song matched](docs/screenshots/web-ui.png)
 
 ***
 
