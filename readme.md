@@ -1,5 +1,7 @@
 <div align="center">
 
+[![CI](https://github.com/icecold009/Shazam-project/actions/workflows/ci.yml/badge.svg)](https://github.com/icecold009/Shazam-project/actions/workflows/ci.yml)
+
 <br/>
 
 **Identify any song from your microphone or an audio file.**  
@@ -10,10 +12,9 @@ FFT analysis · Multi-backend matching · Flask web UI · Terminal output
 
 ***
 <div align="center">
-  <h1 style="margin:0;padding:0">DIY Shazam</h1>
+  <h1 style="margin:0;padding:0">Audio Recognition</h1>
   <p style="margin:4px 0 8px;color:#1E90FF">Identify songs from your microphone or an audio file — FFT + multi-backend matching</p>
 </div>
----
 
 ## Overview
 DIY Shazam captures audio (mic or file), creates a frequency spectrum (FFT), and identifies tracks using one of several backends (RapidAPI/Shazam, AcoustID, AudD). A compact Flask web UI enables browser uploads.
