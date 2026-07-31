@@ -110,12 +110,12 @@ Do not raise these scores based on screenshots or placeholder metrics alone. Upd
 - [ ] Test rate-limit responses and quota accounting through the public route.
 - [ ] Add tests for `load_config()` and `missing_configuration()` including `.env`, missing keys, invalid `FP_CALC_PATH`, and provider combinations.
 - [ ] Add microphone tests using a mocked `sounddevice` implementation, including invalid duration, invalid sample rate, capture failure, and cleanup.
-- [ ] Add coverage reporting and set a realistic minimum threshold after the integration suite exists.
+- [x] Add coverage reporting with `coverage.py`, a 50% minimum threshold, an XML artifact, and a Codecov badge. The current measured branch-coverage baseline is 51% across `shazam_project`, `web`, and `scripts`.
 
 ### Frontend quality
 
 - [x] Fix the two current ESLint errors in `frontend/vite.config.js`.
-- [ ] Add frontend lint and production build to GitHub Actions.
+- [x] Add frontend lint and production build to GitHub Actions.
 - [ ] Add browser/component tests for recording, upload, loading, matched, no-match, unauthorized, rate-limited, and network-error states.
 - [ ] Test microphone permission denial and unsupported `MediaRecorder`/browser behavior.
 - [ ] Test that audio streams and visualizer resources are stopped and released after recording.
@@ -139,7 +139,7 @@ Do not raise these scores based on screenshots or placeholder metrics alone. Upd
 - [ ] Reconcile the README with the actual Flask and React source trees.
 - [ ] Reconcile the documented 8-second CLI behavior, 5-second RapidAPI trim, and 10-second browser recording behavior.
 - [ ] Document that the current FFT is diagnostic and not used for matching, unless the implementation changes.
-- [ ] Replace the stale README “Add CI” roadmap entry with the actual remaining CI work.
+- [x] Replace the stale README “Add CI” roadmap entry with the implemented pytest, coverage, lint, and build gates.
 - [ ] Document the exact source and command used to generate each screenshot.
 - [ ] Add screenshots or recordings for no-match, provider error, permission denial, rate limiting, and upload failure states.
 - [ ] Remove unsupported “platforms tested” claims or attach reproducible platform evidence.
@@ -179,3 +179,4 @@ Record evidence here as work lands:
 | 2026-07-31 | P0/P1 web and matcher slice | `feature/evaluation-todo`; 10 Python unit/integration tests passed; frontend lint and production build passed; dispatcher fallback, browser-origin auth, upload/audio limits, dotenv loading, and runtime status fields were added. | Verified; benchmark, full web coverage, and production deployment remain open |
 | 2026-07-31 | Benchmark tooling slice | `scripts/record_benchmark.py`, `scripts/benchmark.py`, `evaluation/README.md`, and aggregation tests added; 13 Python tests pass. Machine has speaker/microphone devices, FFmpeg, and `fpcalc`; only RapidAPI is configured. | Tooling verified; real corpus and two provider credentials remain required |
 | 2026-07-31 | Local fingerprint backend slice | `shazam_project/fingerprint.py`, local index builder, fourth-backend dispatcher wiring, README/evaluation documentation, and synthetic index tests added; 16 Python tests pass. | Algorithm path verified on synthetic tracks; real speaker/microphone accuracy and API comparison remain open |
+| 2026-07-31 | CI quality-gate slice | `.github/workflows/ci.yml` now runs pytest on every push and pull request across Python 3.10–3.12, enforces 50% branch coverage on Python 3.12, uploads `coverage.xml`, and runs frontend lint/build. Local verification: 16 tests passed; measured branch coverage is 51% including benchmark scripts. | Workflow is committed locally; remote GitHub Actions/Codecov execution remains pending until the branch is pushed |

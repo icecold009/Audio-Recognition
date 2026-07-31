@@ -1,6 +1,7 @@
 <div align="center">
 
-[![CI](https://github.com/icecold009/Shazam-project/actions/workflows/ci.yml/badge.svg)](https://github.com/icecold009/Shazam-project/actions/workflows/ci.yml)
+[![CI](https://github.com/icecold009/audio-recognition/actions/workflows/ci.yml/badge.svg)](https://github.com/icecold009/audio-recognition/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/icecold009/audio-recognition/branch/main/graph/badge.svg)](https://codecov.io/gh/icecold009/audio-recognition)
 
 <br/>
 
@@ -93,11 +94,15 @@ Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`
 `web/app.py` exposes `/api/match` for uploads and `/api/status` for tool/backend checks. Non-WAV uploads are converted with `ffmpeg` if present.
 
 ## Testing
-Run tests:
+Run the Python tests and coverage locally:
 ```powershell
-python -m unittest discover -v
+python -m pytest -q
+python -m coverage run --branch --source=shazam_project,web,scripts -m pytest -q
+python -m coverage report
 ```
 `tests/` covers FFT image creation, mocked provider flows, dispatcher fallback, web routes, and synthetic local fingerprint index matching.
+
+GitHub Actions runs pytest on every push and pull request across Python 3.10, 3.11, and 3.12. A Python 3.12 coverage job enforces at least 50% total coverage across the Python packages and benchmark scripts, publishes `coverage.xml` as an artifact, and uploads it to Codecov. The frontend job also runs ESLint and a production build.
 
 For the real-world comparison, see [`evaluation/README.md`](evaluation/README.md). It records speaker-to-microphone clips at 4, 8, and 15 seconds, builds the local landmark-hash index from clean source tracks, and compares the local backend against all three provider backends.
 
@@ -108,7 +113,7 @@ For the real-world comparison, see [`evaluation/README.md`](evaluation/README.md
 
 ## Contributing
 Pull requests are welcome. For major changes, open an issue first.
-Run `python -m unittest discover -v` before submitting.
+Run `python -m pytest -q` and `python -m coverage report` before submitting.
 
 ***
 
@@ -173,7 +178,7 @@ curl -X POST http://localhost:5000/api/match \
 
 ## Roadmap
 
-- [ ] Add CI — run `pytest` + lint on push
+- [x] Add CI — run pytest + coverage + frontend lint/build on every push and pull request
 - [ ] CLI flags: `--mode`, `--duration`, `--file` for unattended/scripted use
 - [ ] Local match history saved as JSON
 - [ ] `--no-open-image` flag for headless environments
