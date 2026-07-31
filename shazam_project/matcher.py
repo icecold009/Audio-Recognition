@@ -52,25 +52,8 @@ def _extract_audd_image(body: dict[str, Any]) -> str | None:
     return None
 
 
-def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
-    # Try Shazam (RapidAPI) first — most accurate
-    if config.rapidapi_key:
-        try:
-            return match_audio_shazam(clip, config, timeout=timeout)
-        except Exception:
-            pass
-
-    # Fall back to AcoustID
-    if config.acoustid_api_key:
-        try:
-            return match_audio_acoustid(clip, config, timeout=timeout)
-        except Exception:
-            pass
-
-    if not config.audd_api_token:
-        return {"status": "no_token"}
-
-    # write clip to temp file
+def _match_audio_audd(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
+    """Match a clip with AudD and return the shared result shape."""
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
     tmp.close()
     try:
@@ -113,6 +96,60 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
             os.unlink(tmp.name)
         except Exception:
             pass
+
+
+def _attempt_summary(backend: str, response: dict[str, Any]) -> dict[str, Any]:
+    """Return safe diagnostics without copying provider payloads or secrets."""
+    summary = {
+        "backend": backend,
+        "status": response.get("status", "error"),
+    }
+    if response.get("error"):
+        summary["error"] = response["error"]
+    return summary
+
+
+def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
+    """Try configured providers in order and fall back after errors or no-match.
+
+    Provider-specific functions keep their normalized response shape. This
+    dispatcher adds the selected backend and non-sensitive attempt summaries
+    so callers can explain which path produced the result.
+    """
+    providers: list[tuple[str, Any]] = []
+    if config.rapidapi_key:
+        providers.append(("rapidapi", match_audio_shazam))
+    if config.acoustid_api_key:
+        providers.append(("acoustid", match_audio_acoustid))
+    if config.audd_api_token:
+        providers.append(("audd", _match_audio_audd))
+
+    if not providers:
+        return {"status": "no_token", "attempts": []}
+
+    attempts: list[dict[str, Any]] = []
+    last_response: dict[str, Any] = {"status": "error", "error": "No provider response"}
+
+    for backend, provider in providers:
+        try:
+            response = dict(provider(clip, config, timeout=timeout))
+        except Exception as exc:  # defensive boundary for provider adapters
+            response = {"status": "error", "error": str(exc)}
+
+        response["backend"] = backend
+        attempts.append(_attempt_summary(backend, response))
+        last_response = response
+
+        if response.get("status") == "matched":
+            response["attempts"] = attempts
+            return response
+
+        if response.get("status") not in {"error", "no_match", "no_token"}:
+            response["attempts"] = attempts
+            return response
+
+    last_response["attempts"] = attempts
+    return last_response
 
 
 def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:

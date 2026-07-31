@@ -10,7 +10,7 @@ import requests
 def show_result(result: dict[str, Any], open_image: bool = True) -> None:
     status = result.get("status")
     if status == "no_token":
-        print("Recognition disabled: AUDD API token not configured.")
+        print("Recognition disabled: no recognition backend is configured.")
         return
 
     if status == "error":

@@ -71,6 +71,55 @@ class CoreTests(unittest.TestCase):
         artist_val = artist_val or ""
         self.assertIn("Tester", artist_val, msg=f"artist_val did not contain Tester: {artist_val!r}")
 
+    @patch("shazam_project.matcher.match_audio_acoustid")
+    @patch("shazam_project.matcher.match_audio_shazam")
+    def test_dispatcher_falls_back_after_provider_error(self, mock_shazam, mock_acoustid):
+        mock_shazam.return_value = {"status": "error", "error": "temporary outage"}
+        mock_acoustid.return_value = {
+            "status": "matched",
+            "title": "Fallback Song",
+            "artist": "Fallback Artist",
+        }
+
+        clip = AudioClip(samples=np.zeros(100, dtype=np.float32), sample_rate=44100, source="test")
+        cfg = AppConfig(
+            audd_api_token="",
+            acoustid_api_key="ACOUSTID",
+            fpcalc_path=None,
+            rapidapi_key="RAPIDAPI",
+        )
+
+        result = matcher.match_audio(clip, cfg)
+
+        self.assertEqual(result["status"], "matched")
+        self.assertEqual(result["backend"], "acoustid")
+        self.assertEqual(result["attempts"][0]["status"], "error")
+        self.assertEqual(result["attempts"][1]["status"], "matched")
+
+    @patch("shazam_project.matcher._match_audio_audd")
+    @patch("shazam_project.matcher.match_audio_shazam")
+    def test_dispatcher_falls_back_after_no_match(self, mock_shazam, mock_audd):
+        mock_shazam.return_value = {"status": "no_match", "result": None}
+        mock_audd.return_value = {
+            "status": "matched",
+            "title": "AudD Song",
+            "artist": "AudD Artist",
+        }
+
+        clip = AudioClip(samples=np.zeros(100, dtype=np.float32), sample_rate=44100, source="test")
+        cfg = AppConfig(audd_api_token="AUDD", acoustid_api_key="", rapidapi_key="RAPIDAPI")
+
+        result = matcher.match_audio(clip, cfg)
+
+        self.assertEqual(result["status"], "matched")
+        self.assertEqual(result["backend"], "audd")
+        self.assertEqual([item["status"] for item in result["attempts"]], ["no_match", "matched"])
+
+    def test_dispatcher_reports_missing_backend(self):
+        clip = AudioClip(samples=np.zeros(10, dtype=np.float32), sample_rate=44100, source="test")
+        result = matcher.match_audio(clip, AppConfig(audd_api_token=""))
+        self.assertEqual(result, {"status": "no_token", "attempts": []})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -21,13 +21,8 @@ export function useAudioCapture() {
             const formData = new FormData()
             formData.append('file', audioBlob, 'recording.webm')
 
-            const apiSecret = import.meta.env.VITE_API_SECRET || ''
-
             const response = await fetch('/api/match', {  // ← no more localhost
                 method: 'POST',
-                headers: {
-                    'X-API-Secret': apiSecret
-                },
                 body: formData
             })
 

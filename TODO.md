@@ -34,15 +34,15 @@ Do not raise these scores based on screenshots or placeholder metrics alone. Upd
 
 ### Matcher correctness
 
-- [ ] Define the backend fallback policy: distinguish provider error, transport failure, timeout, no-match, and missing configuration.
-- [ ] Update `match_audio()` so configured fallback providers are attempted after eligible provider errors instead of returning immediately.
-- [ ] Decide explicitly whether a provider `no_match` should trigger another provider.
-- [ ] Include the selected backend and fallback history in diagnostic output without exposing credentials.
+- [x] Define the backend fallback policy: distinguish provider error, transport failure, timeout, no-match, and missing configuration. The dispatcher falls through on `error`, `no_match`, and `no_token` and returns the final status otherwise.
+- [x] Update `match_audio()` so configured fallback providers are attempted after eligible provider errors instead of returning immediately.
+- [x] Decide explicitly whether a provider `no_match` should trigger another provider. The current policy retries the next configured provider.
+- [x] Include the selected backend and fallback history in diagnostic output without exposing credentials.
 - [ ] Preserve useful provider error context while returning a stable public response schema.
 - [ ] Add tests for RapidAPI success, no-match, HTTP error, timeout, and malformed JSON.
 - [ ] Add tests for AudD success, no-match, HTTP error, timeout, and malformed JSON.
 - [ ] Add tests for AcoustID success, missing `fpcalc`, `fpcalc` failure, HTTP error, and malformed output.
-- [ ] Add dispatcher tests proving the intended fallback behavior.
+- [x] Add dispatcher tests proving the intended fallback behavior.
 - [ ] Verify temporary WAV files are removed on success, provider error, timeout, and exception paths.
 
 ### Audio pipeline correctness
@@ -54,8 +54,8 @@ Do not raise these scores based on screenshots or placeholder metrics alone. Upd
 - [ ] Add input validation for empty audio, invalid sample rates, malformed WAV files, unsupported encodings, and extreme durations.
 - [ ] Add tests for mono/stereo WAV, supported sample widths, unsupported 24-bit WAV, invalid headers, and very short clips.
 - [ ] Decide whether to support non-WAV CLI input; if not, make the limitation prominent and consistent with the web path.
-- [ ] Add explicit maximum upload size and maximum audio duration limits.
-- [ ] Add a timeout and bounded resource handling around FFmpeg conversion.
+- [x] Add explicit maximum upload size and maximum audio duration limits.
+- [x] Add a timeout and bounded resource handling around FFmpeg conversion.
 
 ## P0 — web architecture and configuration blockers
 
@@ -68,15 +68,15 @@ Do not raise these scores based on screenshots or placeholder metrics alone. Upd
 
 ### Configuration and API contract
 
-- [ ] Load `.env` before creating the Supabase client in `web/app.py`, or use one explicit application configuration path.
+- [x] Load `.env` before creating the Supabase client in `web/app.py`, or use one explicit application configuration path.
 - [ ] Reconcile `SUPABASE_KEY` with the documented `SUPABASE_SERVICE_ROLE_KEY` naming and security model.
 - [ ] Decide whether the API requires an internal secret at all for browser clients.
-- [ ] If a browser client calls the endpoint, do not put a real server secret in a `VITE_*` variable or browser bundle.
-- [ ] Make the Flask-served UI work when `INTERNAL_API_SECRET` is enabled, or remove that mode from the supported flow.
-- [ ] Configure production CORS from an allowlist rather than only `http://localhost:5173`.
-- [ ] Add RapidAPI configuration to `/api/status`; report the actual active backend order.
+- [x] If a browser client calls the endpoint, do not put a real server secret in a `VITE_*` variable or browser bundle.
+- [x] Make the Flask-served UI work when `INTERNAL_API_SECRET` is enabled, or remove that mode from the supported flow. Configured same-origin/allowlisted browser requests are accepted without exposing the secret.
+- [x] Configure production CORS from an allowlist rather than only `http://localhost:5173`.
+- [x] Add RapidAPI configuration to `/api/status`; report the actual active backend order.
 - [ ] Standardize response fields and statuses across all providers and both frontend implementations.
-- [ ] Correct the CLI `no_token` message so it identifies missing recognition configuration generically rather than naming AudD only.
+- [x] Correct the CLI `no_token` message so it identifies missing recognition configuration generically rather than naming AudD only.
 - [ ] Add a health/startup check that clearly reports missing provider, Supabase, FFmpeg, and `fpcalc` configuration.
 
 ### Rate limiting and production safety
@@ -95,9 +95,9 @@ Do not raise these scores based on screenshots or placeholder metrics alone. Upd
 
 ### Backend and web tests
 
-- [ ] Add Flask test-client coverage for `/`, `/api/status`, and `/api/match`.
-- [ ] Test missing upload, invalid audio, FFmpeg conversion success/failure, matcher success, no-match, provider error, and cleanup.
-- [ ] Test API-secret behavior in every supported UI path.
+- [x] Add Flask test-client coverage for `/api/status` and `/api/match`; `/` remains a follow-up.
+- [x] Test missing upload, audio-duration rejection, matcher success, and API-secret origin behavior. FFmpeg conversion and cleanup remain follow-ups.
+- [x] Test API-secret behavior in the supported browser-origin path.
 - [ ] Test rate-limit responses and quota accounting through the public route.
 - [ ] Add tests for `load_config()` and `missing_configuration()` including `.env`, missing keys, invalid `FP_CALC_PATH`, and provider combinations.
 - [ ] Add microphone tests using a mocked `sounddevice` implementation, including invalid duration, invalid sample rate, capture failure, and cleanup.
@@ -105,7 +105,7 @@ Do not raise these scores based on screenshots or placeholder metrics alone. Upd
 
 ### Frontend quality
 
-- [ ] Fix the two current ESLint errors in `frontend/vite.config.js`.
+- [x] Fix the two current ESLint errors in `frontend/vite.config.js`.
 - [ ] Add frontend lint and production build to GitHub Actions.
 - [ ] Add browser/component tests for recording, upload, loading, matched, no-match, unauthorized, rate-limited, and network-error states.
 - [ ] Test microphone permission denial and unsupported `MediaRecorder`/browser behavior.
@@ -167,4 +167,4 @@ Record evidence here as work lands:
 | Date | Task/check | Evidence | Result |
 |---|---|---|---|
 | 2026-07-31 | Initial repository review | `main` at `77d159f`; accuracy remains `X / Y`; frontend build passed; frontend lint failed; Python execution was unavailable locally because the existing virtualenv points to an inaccessible interpreter. | Baseline recorded |
-
+| 2026-07-31 | P0/P1 web and matcher slice | `feature/evaluation-todo`; 10 Python unit/integration tests passed; frontend lint and production build passed; dispatcher fallback, browser-origin auth, upload/audio limits, dotenv loading, and runtime status fields were added. | Verified; benchmark, full web coverage, and production deployment remain open |

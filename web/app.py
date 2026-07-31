@@ -12,13 +12,22 @@ from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 from supabase import create_client, Client
+from dotenv import load_dotenv
 
 from shazam_project import matcher
 from shazam_project.config import load_config
 from shazam_project.recorder import load_audio_file
 
+load_dotenv()
+
 app = Flask(__name__, template_folder="templates", static_folder="static")
-CORS(app, origins=["http://localhost:5173"])
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+]
+CORS(app, origins=CORS_ORIGINS)
+app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 
 # --- Config from env vars ---
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
@@ -27,8 +36,14 @@ DAILY_LIMIT = int(os.getenv("DAILY_LIMIT", "15"))
 MONTHLY_LIMIT = int(os.getenv("MONTHLY_LIMIT", "475"))
 INTERNAL_API_SECRET = os.getenv("INTERNAL_API_SECRET", "")
 COOLDOWN_SECONDS = 30
+MAX_AUDIO_SECONDS = int(os.getenv("MAX_AUDIO_SECONDS", "60"))
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Client | None = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as exc:
+        print(f"Supabase configuration error: {exc}")
 
 last_request_by_ip: dict[str, float] = {}
 
@@ -58,6 +73,8 @@ def _month_key() -> str:
 
 
 def _get_count(key: str) -> int:
+    if supabase is None:
+        return 0
     try:
         res = supabase.table("api_usage").select("call_count").eq("key", key).execute()
         if res.data:
@@ -71,6 +88,8 @@ def _get_count(key: str) -> int:
 
 # NEW — atomic, no race condition
 def _increment_count(key: str) -> None:
+    if supabase is None:
+        return
     try:
         supabase.rpc("increment_api_usage", {"p_key": key}).execute()
     except Exception as e:
@@ -85,6 +104,18 @@ def _get_client_ip() -> str:
         if forwarded:
             return forwarded.split(",")[0].strip()
     return request.remote_addr or "unknown"
+
+
+def _is_same_origin_request() -> bool:
+    origin = request.headers.get("Origin")
+    if origin:
+        normalized = origin.rstrip("/")
+        return normalized == request.host_url.rstrip("/") or normalized in {
+            allowed.rstrip("/") for allowed in CORS_ORIGINS
+        }
+
+    referrer = request.referrer
+    return bool(referrer and referrer.startswith(request.host_url))
 
 
 def _check_rate_limits(ip: str) -> dict:
@@ -153,7 +184,11 @@ def index():
 @app.route("/api/match", methods=["POST"])
 def api_match():
     # Secret header check
-    if INTERNAL_API_SECRET and request.headers.get("X-API-Secret") != INTERNAL_API_SECRET:
+    if (
+        INTERNAL_API_SECRET
+        and request.headers.get("X-API-Secret") != INTERNAL_API_SECRET
+        and not _is_same_origin_request()
+    ):
         return jsonify({"status": "error", "error": "Unauthorized"}), 401
 
     cfg = load_config()
@@ -171,6 +206,7 @@ def api_match():
     suffix = os.path.splitext(filename)[1] or ""
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     wav_path = None
+    converted_path = None
 
     try:
         f.save(tmp.name)
@@ -182,12 +218,13 @@ def api_match():
             if ffmpeg_exe:
                 conv_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
                 conv_tmp.close()
+                converted_path = conv_tmp.name
                 try:
                     cmd = [ffmpeg_exe, "-y", "-i", tmp.name, "-ar", "44100", "-ac", "1", conv_tmp.name]
-                    subprocess.run(cmd, check=True, capture_output=True)
-                    wav_path = conv_tmp.name
-                except subprocess.CalledProcessError:
-                    wav_path = tmp.name
+                    subprocess.run(cmd, check=True, capture_output=True, timeout=30)
+                    wav_path = converted_path
+                except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                    return jsonify({"status": "error", "error": "Audio conversion failed"}), 400
             else:
                 wav_path = tmp.name
 
@@ -195,6 +232,15 @@ def api_match():
             clip = load_audio_file(wav_path)
         except Exception as e:
             return jsonify({"status": "error", "error": f"Failed to load audio: {e}"}), 400
+
+        duration_seconds = len(clip.samples) / clip.sample_rate
+        if duration_seconds > MAX_AUDIO_SECONDS:
+            return jsonify(
+                {
+                    "status": "error",
+                    "error": f"Audio exceeds the {MAX_AUDIO_SECONDS}-second limit",
+                }
+            ), 413
 
         _record_request(ip, limit_check["today"], limit_check["month"], limit_check["now"])
 
@@ -206,8 +252,12 @@ def api_match():
     finally:
         tmp_name = getattr(tmp, "name", None) if "tmp" in locals() else None
         _safe_unlink(tmp_name)
-        if wav_path != tmp_name:
-            _safe_unlink(wav_path)
+        _safe_unlink(converted_path)
+
+
+@app.errorhandler(413)
+def request_entity_too_large(_error):
+    return jsonify({"status": "error", "error": "Uploaded file is too large"}), 413
 
 
 @app.route("/api/status", methods=["GET"])
@@ -215,6 +265,7 @@ def api_status():
     cfg = load_config()
     acoustid_configured = bool(cfg.acoustid_api_key)
     audd_configured = bool(cfg.audd_api_token)
+    rapidapi_configured = bool(cfg.rapidapi_key)
 
     fpcalc_on_path = shutil.which("fpcalc") is not None
     fpcalc_path_exists = False
@@ -231,6 +282,8 @@ def api_status():
 
     return jsonify(
         {
+            "supabase_configured": supabase is not None,
+            "rapidapi_configured": rapidapi_configured,
             "acoustid_configured": acoustid_configured,
             "audd_configured": audd_configured,
             "fpcalc_on_path": fpcalc_on_path,
@@ -241,6 +294,8 @@ def api_status():
             "monthly_used": _get_count(month),
             "monthly_limit": MONTHLY_LIMIT,
             "cooldown_seconds": COOLDOWN_SECONDS,
+            "max_audio_seconds": MAX_AUDIO_SECONDS,
+            "max_upload_bytes": app.config["MAX_CONTENT_LENGTH"],
         }
     )
 
