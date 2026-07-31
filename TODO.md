@@ -142,6 +142,7 @@ Do not raise these scores based on screenshots or placeholder metrics alone. Upd
 - [x] Replace the stale README “Add CI” roadmap entry with the implemented pytest, coverage, lint, and build gates.
 - [ ] Document the exact source and command used to generate each screenshot.
 - [ ] Add screenshots or recordings for no-match, provider error, permission denial, rate limiting, and upload failure states.
+- [x] Add a concise README Limitations section covering noise, catalog coverage, language/region differences, and live/cover/remix versions.
 - [ ] Remove unsupported “platforms tested” claims or attach reproducible platform evidence.
 - [ ] Document API status values, backend selection, required environment variables, and security boundaries from the implementation.
 - [ ] Add a benchmark results section generated from the evaluation output rather than hand-entered numbers.
