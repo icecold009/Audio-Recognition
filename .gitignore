@@ -147,6 +147,13 @@ ENV/
 env.bak/
 venv.bak/
 
+# Local evaluation audio and generated results
+evaluation/clips/
+evaluation/results/
+evaluation/source-cache/
+evaluation/sources.csv
+evaluation/manifest.csv
+
 # Spyder project settings
 .spyderproject
 .spyproject

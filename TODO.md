@@ -17,11 +17,19 @@ Do not raise these scores based on screenshots or placeholder metrics alone. Upd
 
 ## P0 — correctness and evaluation blockers
 
+### Benchmark execution prerequisites
+
+- [ ] Provide 30 known source tracks covering the requested genre and era spread, with title/artist ground truth and source/license notes.
+- [ ] Add `ACOUSTID_API_KEY` and `AUDD_API_TOKEN` to the local `.env` without committing or pasting secrets into chat.
+- [ ] Record the 30 source tracks from speakers through the microphone into 90 clips: 4s, 8s, and 15s per source.
+- [ ] Run all three backends against every recorded clip; do not count missing credentials or missing clips as accuracy results.
+- [ ] Publish the exact overall and per-length denominators, plus one-line explanations for every failure.
+
 ### Reproducible recognition benchmark
 
 - [ ] Define a fixed benchmark manifest with stable track identifiers, title, artist, source, duration, and license/provenance.
 - [ ] Include clean clips, short partial clips, re-encoded clips, noisy clips, volume changes, and live microphone samples where legally and practically possible.
-- [ ] Add a reproducible benchmark command, such as `scripts/benchmark.py`, with documented setup and provider configuration.
+- [x] Add a reproducible benchmark command, `scripts/benchmark.py`, with documented setup and provider configuration. It produces overall, per-length, latency, and failure summaries.
 - [ ] Cache raw provider responses or normalized results so repeated evaluation does not unnecessarily consume API quota.
 - [ ] Measure each backend independently: RapidAPI/Shazam, AcoustID, and AudD.
 - [ ] Report top-1 accuracy using stable identifiers where possible, rather than loose title-string comparisons.
@@ -168,3 +176,4 @@ Record evidence here as work lands:
 |---|---|---|---|
 | 2026-07-31 | Initial repository review | `main` at `77d159f`; accuracy remains `X / Y`; frontend build passed; frontend lint failed; Python execution was unavailable locally because the existing virtualenv points to an inaccessible interpreter. | Baseline recorded |
 | 2026-07-31 | P0/P1 web and matcher slice | `feature/evaluation-todo`; 10 Python unit/integration tests passed; frontend lint and production build passed; dispatcher fallback, browser-origin auth, upload/audio limits, dotenv loading, and runtime status fields were added. | Verified; benchmark, full web coverage, and production deployment remain open |
+| 2026-07-31 | Benchmark tooling slice | `scripts/record_benchmark.py`, `scripts/benchmark.py`, `evaluation/README.md`, and aggregation tests added; 13 Python tests pass. Machine has speaker/microphone devices, FFmpeg, and `fpcalc`; only RapidAPI is configured. | Tooling verified; real corpus and two provider credentials remain required |
