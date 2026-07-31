@@ -15,6 +15,95 @@ Strict evidence-based score at review time: **5/9**.
 
 Do not raise these scores based on screenshots or placeholder metrics alone. Update them only after the evidence gates below are satisfied.
 
+## Ordered repository-polishing roadmap
+
+Complete these main tasks in order. A main task may be ticked only after its subtasks have implementation or evidence support. The detailed P0/P1/P2 checklists below remain the source of implementation detail; this section is the execution order.
+
+### Main task 1 — Real-world benchmark
+
+- [ ] Provide 30 licensed/source tracks across multiple genres and eras, with stable identifiers, title, artist, duration, source, and provenance notes.
+- [ ] Add `ACOUSTID_API_KEY` and `AUDD_API_TOKEN` locally without committing or exposing secrets.
+- [ ] Record 90 speaker-to-microphone clips: 4s, 8s, and 15s per source.
+- [ ] Include clean, partial, re-encoded, noisy, volume-changed, and live/microphone conditions where legally practical.
+- [ ] Cache raw provider responses or normalized results to avoid unnecessary API quota use.
+- [ ] Run RapidAPI/Shazam, AcoustID, AudD, and the local fingerprint backend independently.
+- [ ] Report top-1 accuracy using stable identifiers, with exact denominators overall and by clip length.
+- [ ] Report no-match, false-positive, provider-error, timeout, and unusable-input rates.
+- [ ] Report mean, median, and p95 latency per backend.
+- [ ] Record dataset size, clip length, hardware, operating system, network region, provider plan, date, and warm/cold conditions.
+- [ ] Explain confidence-interval limitations if the dataset is too small.
+- [ ] Replace README placeholder accuracy and timing values with generated, reviewable results.
+- [ ] Tick Main task 1 only after the benchmark can be reproduced from a clean checkout.
+
+### Main task 2 — Audio-pipeline validation
+
+- [ ] Decide and document that FFT is diagnostic or make it part of recognition; currently constellation hashing performs local recognition.
+- [ ] Make CLI and web audio-processing steps consistent, or document their intentional differences.
+- [ ] Validate empty audio, invalid sample rates, malformed WAV headers, unsupported encodings, and extreme durations.
+- [ ] Add mono/stereo, supported sample-width, unsupported 24-bit, malformed-header, and very-short-clip tests.
+- [ ] Decide whether non-WAV CLI input is supported and make the limitation consistent across CLI and web paths.
+- [ ] Tick Main task 2 only after validation behavior and tests are documented.
+
+### Main task 3 — Authoritative web application
+
+- [ ] Decide whether Flask `web/` or Vite/React `frontend/` is the supported application.
+- [ ] Retire the unused implementation or bring both implementations to the same API contract and feature level.
+- [ ] Document the canonical development command, production build, served UI, and screenshot source.
+- [ ] Ensure the README architecture diagram describes the actual runtime path.
+- [ ] Tick Main task 3 only after a reviewer can identify and run the supported web path unambiguously.
+
+### Main task 4 — Production configuration and security
+
+- [ ] Reconcile `SUPABASE_KEY` with service-role-key naming and the intended security model.
+- [ ] Decide whether `INTERNAL_API_SECRET` is required for the supported browser flow.
+- [ ] Standardize response fields and statuses across providers and frontend implementations.
+- [ ] Add a startup/health check for provider, Supabase, FFmpeg, and `fpcalc` configuration.
+- [ ] Make quota checks and increments atomic, and define fail-closed behavior for Supabase failures.
+- [ ] Bound cooldown/IP state and document the trusted proxy model.
+- [ ] Add `Retry-After` headers and disable debug mode outside explicit local development.
+- [ ] Add a production WSGI/server configuration and tests for authorization, limits, concurrency, and Supabase failures.
+- [ ] Tick Main task 4 only after the security/configuration review has evidence and no undocumented production assumptions.
+
+### Main task 5 — Test-depth expansion
+
+- [ ] Test rate-limit responses and quota accounting through public routes.
+- [ ] Test configuration loading, missing keys, invalid `FP_CALC_PATH`, and provider combinations.
+- [ ] Add mocked microphone tests for invalid duration/sample rate, capture failure, and cleanup.
+- [ ] Add browser/component tests for recording, upload, loading, matched, no-match, unauthorized, rate-limited, and network-error states.
+- [ ] Test microphone permission denial and unsupported `MediaRecorder` behavior.
+- [ ] Test that audio streams, visualizers, and other recording resources are released.
+- [ ] Test safe rendering when album, artwork, genre, release date, or links are missing.
+- [ ] Tick Main task 5 only after the important failure states are covered without real provider credentials.
+
+### Main task 6 — Dependency, CI, and repository hygiene
+
+- [x] Run pytest, coverage, frontend lint, and frontend build in GitHub Actions on every push and pull request.
+- [ ] Verify the workflow on the remote evaluation branch and confirm Codecov receives the report.
+- [ ] Verify Python tests in a clean supported environment.
+- [ ] Pin or constrain Python dependencies and add Python lint/static checks to CI.
+- [ ] Add dependency/security scanning and secret scanning.
+- [ ] Keep generated screenshots/test artifacts out of the source tree and remove stale or duplicate scaffold files.
+- [ ] Tick Main task 6 only after remote CI and repository hygiene checks are evidenced.
+
+### Main task 7 — Documentation reconciliation
+
+- [ ] Split documentation into Implemented, Known limitations, Planned, and Evaluation evidence sections.
+- [ ] Mark unsupported Supabase/auth/history/RLS/Vercel/account/settings claims as planned or remove them.
+- [ ] Reconcile README content with the actual Flask and React source trees.
+- [ ] Reconcile documented 8-second CLI, 5-second RapidAPI trim, and 10-second browser-recording behavior.
+- [ ] Document the exact source and command for each screenshot, and add failure-state screenshots where useful.
+- [ ] Remove unsupported platform claims and document API statuses, backend order, environment variables, and security boundaries.
+- [ ] Tick Main task 7 only after documentation describes shipped behavior rather than aspiration.
+
+### Main task 8 — Distinctiveness and technical contribution
+
+- [ ] Evaluate the offline/local fingerprinting path against provider-backed baselines.
+- [ ] Measure robustness under noise, re-encoding, volume changes, pitch changes, and partial clips.
+- [ ] Add confidence-aware matching or provider consensus with an honest no-match threshold.
+- [ ] Explain the constellation-map/hash-pair contribution in the README and benchmark it against external APIs.
+- [ ] Update the distinctiveness score only after the capability is evaluated with real evidence.
+- [ ] Tick Main task 8 only after the local contribution is reproducibly benchmarked and explained.
+
 ## P0 — correctness and evaluation blockers
 
 ### Benchmark execution prerequisites
@@ -181,4 +270,5 @@ Record evidence here as work lands:
 | 2026-07-31 | Benchmark tooling slice | `scripts/record_benchmark.py`, `scripts/benchmark.py`, `evaluation/README.md`, and aggregation tests added; 13 Python tests pass. Machine has speaker/microphone devices, FFmpeg, and `fpcalc`; only RapidAPI is configured. | Tooling verified; real corpus and two provider credentials remain required |
 | 2026-07-31 | Local fingerprint backend slice | `shazam_project/fingerprint.py`, local index builder, fourth-backend dispatcher wiring, README/evaluation documentation, and synthetic index tests added; 16 Python tests pass. | Algorithm path verified on synthetic tracks; real speaker/microphone accuracy and API comparison remain open |
 | 2026-07-31 | Matcher correctness slice | Provider adapters now return stable `error_code` values with diagnostic detail; mocked RapidAPI, AudD, and AcoustID success/no-match/HTTP/timeout/malformed-output tests and temporary-WAV cleanup tests were added. | 36 pytest tests passed; branch coverage is 59%; real provider behavior and credentialed smoke tests remain open |
+| 2026-07-31 | Polishing roadmap | Added an ordered eight-task execution roadmap covering benchmark evidence, audio validation, web ownership, production security, test depth, CI/repository hygiene, documentation reconciliation, and distinctiveness evaluation. | Roadmap recorded; complete one main task at a time |
 | 2026-07-31 | CI quality-gate slice | `.github/workflows/ci.yml` now runs pytest on every push and pull request across Python 3.10–3.12, enforces 50% branch coverage on Python 3.12, uploads `coverage.xml`, and runs frontend lint/build. Local verification: 16 tests passed; measured branch coverage is 51% including benchmark scripts. | Workflow is committed locally; remote GitHub Actions/Codecov execution remains pending until the branch is pushed |
