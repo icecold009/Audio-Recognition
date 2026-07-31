@@ -47,12 +47,12 @@ Do not raise these scores based on screenshots or placeholder metrics alone. Upd
 - [x] Update `match_audio()` so configured fallback providers are attempted after eligible provider errors instead of returning immediately.
 - [x] Decide explicitly whether a provider `no_match` should trigger another provider. The current policy retries the next configured provider.
 - [x] Include the selected backend and fallback history in diagnostic output without exposing credentials.
-- [ ] Preserve useful provider error context while returning a stable public response schema.
-- [ ] Add tests for RapidAPI success, no-match, HTTP error, timeout, and malformed JSON.
-- [ ] Add tests for AudD success, no-match, HTTP error, timeout, and malformed JSON.
-- [ ] Add tests for AcoustID success, missing `fpcalc`, `fpcalc` failure, HTTP error, and malformed output.
+- [x] Preserve useful provider error context while returning a stable public response schema with `error_code` plus non-sensitive detail.
+- [x] Add tests for RapidAPI success, no-match, HTTP error, timeout, and malformed JSON.
+- [x] Add tests for AudD success, no-match, HTTP error, timeout, and malformed JSON.
+- [x] Add tests for AcoustID success, missing `fpcalc`, `fpcalc` failure, HTTP error, and malformed output.
 - [x] Add dispatcher tests proving the intended fallback behavior.
-- [ ] Verify temporary WAV files are removed on success, provider error, timeout, and exception paths.
+- [x] Verify temporary WAV files are removed on success, provider error, timeout, and exception paths.
 
 ### Audio pipeline correctness
 
@@ -180,4 +180,5 @@ Record evidence here as work lands:
 | 2026-07-31 | P0/P1 web and matcher slice | `feature/evaluation-todo`; 10 Python unit/integration tests passed; frontend lint and production build passed; dispatcher fallback, browser-origin auth, upload/audio limits, dotenv loading, and runtime status fields were added. | Verified; benchmark, full web coverage, and production deployment remain open |
 | 2026-07-31 | Benchmark tooling slice | `scripts/record_benchmark.py`, `scripts/benchmark.py`, `evaluation/README.md`, and aggregation tests added; 13 Python tests pass. Machine has speaker/microphone devices, FFmpeg, and `fpcalc`; only RapidAPI is configured. | Tooling verified; real corpus and two provider credentials remain required |
 | 2026-07-31 | Local fingerprint backend slice | `shazam_project/fingerprint.py`, local index builder, fourth-backend dispatcher wiring, README/evaluation documentation, and synthetic index tests added; 16 Python tests pass. | Algorithm path verified on synthetic tracks; real speaker/microphone accuracy and API comparison remain open |
+| 2026-07-31 | Matcher correctness slice | Provider adapters now return stable `error_code` values with diagnostic detail; mocked RapidAPI, AudD, and AcoustID success/no-match/HTTP/timeout/malformed-output tests and temporary-WAV cleanup tests were added. | 36 pytest tests passed; branch coverage is 59%; real provider behavior and credentialed smoke tests remain open |
 | 2026-07-31 | CI quality-gate slice | `.github/workflows/ci.yml` now runs pytest on every push and pull request across Python 3.10–3.12, enforces 50% branch coverage on Python 3.12, uploads `coverage.xml`, and runs frontend lint/build. Local verification: 16 tests passed; measured branch coverage is 51% including benchmark scripts. | Workflow is committed locally; remote GitHub Actions/Codecov execution remains pending until the branch is pushed |
