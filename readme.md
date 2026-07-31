@@ -17,7 +17,7 @@ FFT analysis · Multi-backend matching · Flask web UI · Terminal output
 </div>
 
 ## Overview
-DIY Shazam captures audio (mic or file), creates a frequency spectrum (FFT), and identifies tracks using one of several backends (RapidAPI/Shazam, AcoustID, AudD). A compact Flask web UI enables browser uploads.
+DIY Shazam captures audio (mic or file), creates a frequency spectrum (FFT), and identifies tracks using RapidAPI/Shazam, AcoustID, AudD, or a locally built constellation-hash fingerprint index. A compact Flask web UI enables browser uploads.
 
 ## Performance
 
@@ -39,10 +39,11 @@ flowchart LR
   E -->|RapidAPI| F[Shazam]
   E -->|AcoustID| G[AcoustID]
   E -->|AudD| H[AudD]
-  F & G & H --> I[Normalized Result]
-  I --> J[Display (CLI) / JSON (Web)]
+  E -->|Local hashes| I[Local fingerprint index]
+  F & G & H & I --> J[Normalized Result]
+  J --> K[Display (CLI) / JSON (Web)]
   classDef blue fill:#ffffff,stroke:#1E90FF,stroke-width:2px,color:#1E90FF;
-  class A,B,C,D,E,F,G,H,I,J blue;
+  class A,B,C,D,E,F,G,H,I,J,K blue;
 ```
 Theme: black / white / blue — white nodes with a professional DodgerBlue accent (#1E90FF).
 
@@ -86,7 +87,7 @@ Entrypoints remain:
 - `web/app.py` (Flask web app)
 
 ## Configuration
-Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`, `ACOUSTID_API_KEY`, `FP_CALC_PATH`, `RAPIDAPI_KEY`. Matcher order: RapidAPI → AcoustID → AudD.
+Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`, `ACOUSTID_API_KEY`, `FP_CALC_PATH`, `RAPIDAPI_KEY`, and optional `LOCAL_FINGERPRINT_INDEX`. Matcher order: RapidAPI → AcoustID → AudD → local fingerprint index.
 
 ## Web UI
 `web/app.py` exposes `/api/match` for uploads and `/api/status` for tool/backend checks. Non-WAV uploads are converted with `ffmpeg` if present.
@@ -96,7 +97,9 @@ Run tests:
 ```powershell
 python -m unittest discover -v
 ```
-`tests/test_core.py` covers FFT image creation and a mocked AcoustID flow.
+`tests/` covers FFT image creation, mocked provider flows, dispatcher fallback, web routes, and synthetic local fingerprint index matching.
+
+For the real-world comparison, see [`evaluation/README.md`](evaluation/README.md). It records speaker-to-microphone clips at 4, 8, and 15 seconds, builds the local landmark-hash index from clean source tracks, and compares the local backend against all three provider backends.
 
 ## Notes & Tips
 - Record in a quiet space and keep the mic near the audio source.

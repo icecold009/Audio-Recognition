@@ -19,6 +19,7 @@ BACKENDS: dict[str, tuple[str, Callable[..., dict[str, Any]], str]] = {
     "rapidapi": ("RapidAPI/Shazam", matcher.match_audio_shazam, "rapidapi_key"),
     "acoustid": ("AcoustID", matcher.match_audio_acoustid, "acoustid_api_key"),
     "audd": ("AudD", matcher._match_audio_audd, "audd_api_token"),
+    "local": ("Local constellation-hash", matcher.match_audio_local, "fingerprint_index_path"),
 }
 
 

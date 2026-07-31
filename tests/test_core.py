@@ -120,6 +120,22 @@ class CoreTests(unittest.TestCase):
         result = matcher.match_audio(clip, AppConfig(audd_api_token=""))
         self.assertEqual(result, {"status": "no_token", "attempts": []})
 
+    @patch("shazam_project.matcher.match_audio_local")
+    def test_dispatcher_includes_local_fingerprint_backend(self, mock_local):
+        mock_local.return_value = {
+            "status": "matched",
+            "title": "Local Song",
+            "artist": "Local Artist",
+        }
+        clip = AudioClip(samples=np.zeros(10, dtype=np.float32), sample_rate=44100, source="test")
+        cfg = AppConfig(audd_api_token="", fingerprint_index_path="index.json")
+
+        result = matcher.match_audio(clip, cfg)
+
+        self.assertEqual(result["status"], "matched")
+        self.assertEqual(result["backend"], "local")
+        mock_local.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -37,6 +37,7 @@ Do not raise these scores based on screenshots or placeholder metrics alone. Upd
 - [ ] Report median, p95, and average recognition latency separately for each backend.
 - [ ] Record dataset size, clip length, hardware, operating system, network region, date, provider plan, and warm/cold conditions.
 - [ ] Add confidence intervals or an explicit limitation explaining why the benchmark is too small for them.
+- [x] Implement a fourth local constellation-map/hash-pair backend over a small library, with an index builder and benchmark integration. Real-world accuracy and speed comparison remain open until the corpus is recorded.
 - [ ] Replace `Test set accuracy | X / Y songs matched correctly` in `readme.md` with generated, reviewable results.
 - [ ] Remove or substantiate the existing `~2.1 s` and `~3.4 s` performance values.
 
@@ -177,3 +178,4 @@ Record evidence here as work lands:
 | 2026-07-31 | Initial repository review | `main` at `77d159f`; accuracy remains `X / Y`; frontend build passed; frontend lint failed; Python execution was unavailable locally because the existing virtualenv points to an inaccessible interpreter. | Baseline recorded |
 | 2026-07-31 | P0/P1 web and matcher slice | `feature/evaluation-todo`; 10 Python unit/integration tests passed; frontend lint and production build passed; dispatcher fallback, browser-origin auth, upload/audio limits, dotenv loading, and runtime status fields were added. | Verified; benchmark, full web coverage, and production deployment remain open |
 | 2026-07-31 | Benchmark tooling slice | `scripts/record_benchmark.py`, `scripts/benchmark.py`, `evaluation/README.md`, and aggregation tests added; 13 Python tests pass. Machine has speaker/microphone devices, FFmpeg, and `fpcalc`; only RapidAPI is configured. | Tooling verified; real corpus and two provider credentials remain required |
+| 2026-07-31 | Local fingerprint backend slice | `shazam_project/fingerprint.py`, local index builder, fourth-backend dispatcher wiring, README/evaluation documentation, and synthetic index tests added; 16 Python tests pass. | Algorithm path verified on synthetic tracks; real speaker/microphone accuracy and API comparison remain open |

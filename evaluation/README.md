@@ -2,6 +2,8 @@
 
 This benchmark is intentionally based on speaker-to-microphone recordings. Clean source files are used only as playback material; the clips sent to the recognition providers are the microphone captures.
 
+The local backend follows the high-level landmark-fingerprint pipeline described by Avery Li-Chun Wang in [An Industrial-Strength Audio Search Algorithm](https://www.ee.columbia.edu/~dpwe/papers/Wang03-shazam.pdf), ISMIR 2003: spectral peaks are paired into hashes, then matched by a consistent time offset. This is an educational, small-library implementation rather than a claim to reproduce Shazam's production-scale database or parameter tuning.
+
 ## Target design
 
 - 30 source tracks, producing 90 clips: one 4-second, one 8-second, and one 15-second clip per track.
@@ -43,13 +45,23 @@ Use `--yes` only after confirming the device indices and physical room setup. Th
 
 ## Run all backends
 
+Build the local fourth backend from the clean source tracks before running the comparison:
+
+```powershell
+.\\.venv\\Scripts\\python.exe scripts/build_fingerprint_index.py `
+  --sources evaluation/sources.csv `
+  --output evaluation/results/fingerprint-index.json
+```
+
+Set `LOCAL_FINGERPRINT_INDEX` in `.env` to that path if you also want the normal application dispatcher to expose the local backend.
+
 ```powershell
 .\\.venv\\Scripts\\python.exe scripts/benchmark.py `
   --manifest evaluation/manifest.csv `
   --output evaluation/results/benchmark.json
 ```
 
-The runner calls RapidAPI/Shazam, AcoustID, and AudD independently. It reports configured coverage rather than treating a missing credential as a successful zero score.
+The runner calls RapidAPI/Shazam, AcoustID, AudD, and the local constellation-hash backend independently. It reports configured coverage rather than treating a missing credential as a successful zero score.
 
 The JSON output contains:
 

@@ -15,6 +15,7 @@ import numpy as np
 import requests
 
 from .config import AppConfig
+from .fingerprint import match_local_index
 from .recorder import AudioClip
 
 
@@ -123,6 +124,8 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
         providers.append(("acoustid", match_audio_acoustid))
     if config.audd_api_token:
         providers.append(("audd", _match_audio_audd))
+    if config.fingerprint_index_path:
+        providers.append(("local", match_audio_local))
 
     if not providers:
         return {"status": "no_token", "attempts": []}
@@ -323,3 +326,14 @@ def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) ->
             os.unlink(tmp.name)
         except Exception:
             pass
+
+
+def match_audio_local(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
+    """Match a clip against the local constellation-hash index."""
+    del timeout  # the local matcher is CPU-bound and does not make network calls
+    if not config.fingerprint_index_path:
+        return {"status": "no_token"}
+    try:
+        return match_local_index(clip, config.fingerprint_index_path)
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
