@@ -121,13 +121,32 @@ Recognition is not guaranteed outside the happy path. The main failure modes are
 
 The evaluation dataset is designed to measure these cases separately. Until that dataset is recorded and run through all configured backends, the README does not claim a general accuracy percentage.
 
-## Production blockers for Prompt 4
+## Production rate limits
 
-This PR documents the shipped pipeline and does not redesign authentication or quotas. Before production deployment, Prompt 4 must address:
+Production quota enforcement uses the exposed-but-restricted `public.check_api_quota` preflight and `public.consume_api_quota` RPCs created by [`supabase/migrations/20260801145213_production_rate_limits.sql`](supabase/migrations/20260801145213_production_rate_limits.sql). The preflight is read-only and runs before upload saving; the final operation locks one HMAC-keyed usage row and checks cooldown, daily, and monthly limits before incrementing both counters atomically after valid audio decoding. Both functions are `SECURITY INVOKER`, use an explicit safe search path, and are executable only by `service_role`. The `public.api_usage` table has RLS enabled, no public policies, and no grants to `anon` or `authenticated`; the private schema is not exposed.
 
-- The configured Origin/Referer path can bypass `INTERNAL_API_SECRET` for same-origin or allowlisted browser requests; the trust model and secret boundary need a deliberate production decision.
-- Supabase quota reads and increments are not atomic, so concurrent requests can race past limits.
-- Supabase failures currently fail open by returning zero usage and continuing recognition; production behavior must be fail-closed or visibly disable quota-protected recognition.
+Required server-only configuration:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY` — never put this value in JavaScript, HTML, API responses, logs, or screenshots.
+- `CLIENT_ID_HMAC_SECRET` — a separate secret used to derive the stored client identifier; raw IP addresses are never stored.
+
+The local development quickstart uses `APP_ENV=development`, so local Flask matching works without Supabase and uses a bounded, expiring in-memory limiter. To exercise production behavior, set `APP_ENV=production` and provide all three server-only values above; missing configuration or a quota-service failure returns HTTP 503 rather than assuming zero usage. `APP_ENV=production` should be configured separately in the deployment environment, never copied blindly into a local `.env`.
+
+The migration workflow is:
+
+```powershell
+supabase start
+supabase db reset
+supabase db advisors --local --type all --fail-on warn
+supabase migration list --local
+```
+
+For a disposable linked development project, verify with `supabase link --project-ref <project-ref>`, `supabase db push --dry-run`, `supabase db push`, `supabase db advisors --linked --type all --fail-on warn`, and `supabase migration list --linked`. Never run `supabase db reset --linked` against production. The migration was created with `supabase migration new production_rate_limits`.
+
+`/api/status` reports the quota mode, configured daily/monthly limits, cooldown, and whether production-grade quotas are enabled; it never reports client hashes or usage rows.
+
+`INTERNAL_API_SECRET`, when configured, prevents the current browser UI from calling `/api/match` unless a deliberate server-side authentication design supplies `X-API-Secret`; the secret is never placed in JavaScript. An allowed `Origin` or `Referer` can never authenticate a request. Forwarded client addresses are ignored unless both `TRUSTED_PROXY_COUNT` and an allowlisted `TRUSTED_PROXY_IPS` chain are configured; every trusted proxy hop is validated when more than one hop is configured. Flask debug mode is enabled only when `APP_ENV=development`.
 
 ## Notes & Tips
 - Record in a quiet space and keep the mic near the audio source.
