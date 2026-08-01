@@ -24,11 +24,11 @@ DIY Shazam captures audio (mic or file), creates a frequency spectrum (FFT), and
 
 | Metric | Result |
 |--------|--------|
-| Average recognition time (RapidAPI backend) | ~2.1 s |
-| Average recognition time (AudD backend) | ~3.4 s |
-| Test set accuracy | X / Y songs matched correctly |
+| Average recognition time (RapidAPI backend) | Not measured; real-world benchmark pending |
+| Average recognition time (AudD backend) | Not measured; real-world benchmark pending |
+| Test set accuracy | Not measured; real-world benchmark pending |
 | Sample audio length required | 8 s (configurable) |
-| Platforms tested | Windows 11, Ubuntu 22.04, macOS 14 |
+| Platforms tested | Not established by this branch's validation |
 
 ## Architecture
 ```mermaid
