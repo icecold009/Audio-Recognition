@@ -90,7 +90,7 @@ Entrypoints remain:
 - `web/templates/index.html` and `web/static/` (same-origin browser assets)
 
 ## Configuration
-Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`, `ACOUSTID_API_KEY`, `FP_CALC_PATH`, `RAPIDAPI_KEY`, and optional `LOCAL_FINGERPRINT_INDEX` (with `FINGERPRINT_INDEX_PATH` accepted as a legacy alias). The shared audio contract is controlled by `INTERNAL_SAMPLE_RATE`, `INTERNAL_SAMPLE_WIDTH`, `MIN_AUDIO_SECONDS`, `MAX_AUDIO_SECONDS`, `MAX_UPLOAD_BYTES`, and `FFMPEG_TIMEOUT_SECONDS`. Matcher order is RapidAPI → AcoustID → AudD → local fingerprint index.
+Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`, `ACOUSTID_API_KEY`, `FP_CALC_PATH`, `RAPIDAPI_KEY`, and optional `LOCAL_FINGERPRINT_INDEX` (with `FINGERPRINT_INDEX_PATH` accepted as a legacy alias). The shared audio contract is controlled by `INTERNAL_SAMPLE_RATE`, `MIN_AUDIO_SECONDS`, `MAX_AUDIO_SECONDS`, `MAX_UPLOAD_BYTES`, and `FFMPEG_TIMEOUT_SECONDS`; provider WAVs are always fixed 16-bit PCM. Matcher order is RapidAPI → AcoustID → AudD → local fingerprint index.
 
 ## Web UI
 `python web/app.py` serves `/`, `/static/*`, `/api/match`, and `/api/status` from the same origin. CLI file mode accepts WAV/PCM files. Web uploads support WAV, MP3, M4A, AAC, OGG, FLAC, and WEBM; non-WAV web uploads require FFmpeg on `PATH` and are converted before decoding. The browser also supports microphone recording, manual stop, waveform visualization, loading/error/no-match states, light/dark theme persistence, and session-only recognition history.
@@ -146,7 +146,7 @@ Run `python -m pytest -q` and `python -m coverage report` before submitting.
 Listen via microphone or load a file? (mic/file): mic
 
 Recording for 8 seconds...
-FFT diagnostic visualization saved to fft_output.png
+Recognition uses the normalized recording and configured matcher backends.
 
 Song:    Blinding Lights
 Artist:  The Weeknd
@@ -186,7 +186,7 @@ curl -X POST http://localhost:5000/api/match \
 }
 ```
 
-Public `status` is one of: `matched` · `no_match` · `not_configured` · `invalid_audio` · `rate_limited` · `error`. Provider attempts may include safe `error_code` and diagnostic fields, but raw provider payloads, credentials, local paths, and stack traces are not public response data.
+Public `status` is one of: `matched` · `no_match` · `not_configured` · `invalid_audio` · `rate_limited` · `error`. Provider attempts contain only backend/status/error codes and generic safe messages; raw provider payloads, credentials, local paths, and stack traces are not public response data.
 
 ***
 

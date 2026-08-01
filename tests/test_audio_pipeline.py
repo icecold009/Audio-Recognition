@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
+import sys
 import tempfile
 import wave
 from unittest.mock import MagicMock, patch
@@ -19,6 +20,7 @@ from shazam_project.recorder import (
     convert_with_ffmpeg,
     load_audio_file,
     normalize_audio,
+    record_microphone,
     temporary_wav,
 )
 
@@ -186,6 +188,70 @@ def test_public_matcher_statuses_and_safe_diagnostics():
     assert result["status"] == "not_configured"
     assert {attempt["status"] for attempt in result["attempts"]} == {"not_configured"}
     assert "result" not in result
+
+
+def test_matcher_passes_normalized_clip_to_every_provider():
+    raw = np.column_stack((valid_samples(rate=8000), -valid_samples(rate=8000)))
+    clip = AudioClip(raw, 8000, "unnormalized-stereo")
+    captured = {}
+
+    def provider(received_clip, _config, timeout):
+        captured["clip"] = received_clip
+        captured["timeout"] = timeout
+        return {"status": "matched", "title": "Normalized Song"}
+
+    with patch.object(matcher, "match_audio_shazam", side_effect=provider):
+        result = matcher.match_audio(clip, config(), timeout=7)
+
+    received = captured["clip"]
+    assert result["status"] == "matched"
+    assert received.sample_rate == 16000
+    assert received.samples.ndim == 1
+    assert received.samples.dtype == np.float32
+    assert captured["timeout"] == 7
+
+
+def test_provider_diagnostics_do_not_leak_paths_or_exception_details():
+    clip = AudioClip(valid_samples(44100), 44100, "provider-test", path=Path(r"C:\private\source.wav"))
+    cfg = config(rapidapi_key="KEY")
+    leaked = r"C:\private\tmp\provider-secret: raw fpcalc stderr"
+
+    with patch.object(matcher, "match_audio_shazam", side_effect=RuntimeError(leaked)):
+        response = matcher.match_audio(clip, cfg)
+
+    serialized = str(response)
+    assert response["attempts"][0]["status"] == "error"
+    assert response["attempts"][0]["error_code"] == "provider_error"
+    assert "Recognition provider failed." in serialized
+    assert leaked not in serialized
+    assert "C:\\private" not in serialized
+
+
+def test_local_provider_diagnostics_do_not_expose_index_paths():
+    clip = AudioClip(valid_samples(16000), 16000, "local")
+    cfg = config(fingerprint_index_path="C:\\private\\fingerprints\\index.json")
+    local_result = {
+        "status": "matched",
+        "result": {"audio_path": "C:\\private\\catalog\\track.wav"},
+        "title": "Local Song",
+    }
+
+    with patch.object(matcher, "match_local_index", return_value=local_result):
+        response = matcher.match_audio_local(clip, cfg)
+
+    assert response["status"] == "matched"
+    assert "result" not in response
+    assert "C:\\private" not in str(response)
+
+
+@pytest.mark.parametrize("duration, code", [(0.5, "too_short"), (6, "too_long")])
+def test_record_microphone_rejects_configured_duration_limits_before_recording(duration, code):
+    sounddevice = MagicMock()
+    with patch.dict(sys.modules, {"sounddevice": sounddevice}):
+        with pytest.raises(AudioInputError) as exc_info:
+            record_microphone(duration, sample_rate=16000, config=config())
+    assert exc_info.value.code == code
+    sounddevice.rec.assert_not_called()
 
 
 def test_matcher_fallback_order_continues_after_no_match_and_error():

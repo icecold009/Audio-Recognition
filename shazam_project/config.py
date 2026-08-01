@@ -16,7 +16,6 @@ class AppConfig:
     fft_output_path: Path = Path("fft_output.png")
     rapidapi_key: str = ""
     internal_sample_rate: int = 44100
-    internal_sample_width: int = 2
     min_audio_seconds: float = 1.0
     max_audio_seconds: float = 30.0
     max_upload_bytes: int = 10 * 1024 * 1024
@@ -47,7 +46,6 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
         fpcalc_path=os.getenv("FP_CALC_PATH", None),
         rapidapi_key=os.getenv("RAPIDAPI_KEY", "").strip(),
         internal_sample_rate=_int("INTERNAL_SAMPLE_RATE", 44100),
-        internal_sample_width=_int("INTERNAL_SAMPLE_WIDTH", 2),
         min_audio_seconds=_float("MIN_AUDIO_SECONDS", 1.0),
         max_audio_seconds=_float("MAX_AUDIO_SECONDS", 30.0),
         max_upload_bytes=_int("MAX_UPLOAD_BYTES", 10 * 1024 * 1024),

@@ -1,5 +1,6 @@
 import subprocess
 import unittest
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -33,7 +34,8 @@ class ProviderAdapterTests(unittest.TestCase):
     def _assert_error(self, result, code: str, detail: str):
         self.assertEqual(result["status"], "error")
         self.assertEqual(result["error_code"], code)
-        self.assertIn(detail, result["error"])
+        self.assertEqual(result["error"], matcher.SAFE_ERROR_MESSAGES[code])
+        self.assertNotIn(detail, result["error"])
 
     def _assert_temp_file_removed(self, write_mock):
         temp_path = Path(write_mock.call_args.args[1])
@@ -217,6 +219,24 @@ class ProviderAdapterTests(unittest.TestCase):
         get.return_value = _response(json_error=ValueError("not json"))
         result = matcher.match_audio_acoustid(_clip(), AppConfig("", acoustid_api_key="KEY"))
         self._assert_error(result, "malformed_response", "AcoustID returned invalid JSON")
+
+    @patch("shazam_project.matcher.requests.post", side_effect=RuntimeError(r"C:\private\temp\provider internals"))
+    def test_provider_exception_diagnostics_are_not_public(self, post):
+        result = matcher.match_audio_shazam(_clip(), AppConfig("", rapidapi_key="KEY"))
+        public = json.dumps(result)
+        self.assertEqual(result["error_code"], "provider_error")
+        self.assertNotIn("C:\\private", public)
+        self.assertNotIn("provider internals", public)
+
+    @patch("shazam_project.matcher.shutil.which", return_value="fpcalc")
+    @patch("shazam_project.matcher.subprocess.run")
+    def test_fpcalc_stderr_is_not_public(self, run, which):
+        run.return_value = MagicMock(returncode=1, stdout="", stderr=r"C:\temp\fpcalc secret stderr")
+        result = matcher.match_audio_acoustid(_clip(), AppConfig("", acoustid_api_key="KEY"))
+        public = json.dumps(result)
+        self.assertEqual(result["error_code"], "fpcalc_error")
+        self.assertNotIn("C:\\temp", public)
+        self.assertNotIn("secret stderr", public)
 
 
 if __name__ == "__main__":

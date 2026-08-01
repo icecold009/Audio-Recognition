@@ -220,6 +220,11 @@ def api_match():
     if "file" not in request.files:
         return jsonify({"status": "invalid_audio", "error_code": "missing_upload", "error": "No audio file was uploaded."}), 400
 
+    client_ip = _get_client_ip()
+    limit_check = _check_rate_limits(client_ip)
+    if limit_check["blocked"]:
+        return jsonify(limit_check["payload"]), limit_check["status_code"]
+
     config = load_config()
     try:
         clip = _load_web_upload(request.files["file"], config)
@@ -227,11 +232,6 @@ def api_match():
         return _audio_error_response(exc)
     except Exception:
         return jsonify({"status": "error", "error_code": "upload_failed", "error": "Audio upload could not be processed."}), 400
-
-    client_ip = _get_client_ip()
-    limit_check = _check_rate_limits(client_ip)
-    if limit_check["blocked"]:
-        return jsonify(limit_check["payload"]), limit_check["status_code"]
 
     _record_request(client_ip, limit_check["today"], limit_check["month"], limit_check["now"])
     try:
@@ -267,7 +267,6 @@ def api_status():
             "ffmpeg_on_path": bool(shutil.which("ffmpeg")),
             "supported_formats": list(SUPPORTED_WEB_FORMATS),
             "internal_sample_rate": config.internal_sample_rate,
-            "internal_sample_width": config.internal_sample_width,
             "min_audio_seconds": config.min_audio_seconds,
             "max_audio_seconds": config.max_audio_seconds,
             "max_upload_bytes": config.max_upload_bytes,

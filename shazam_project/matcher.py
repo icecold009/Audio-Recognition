@@ -23,12 +23,26 @@ AUDD_ENDPOINT = "https://api.audd.io/"
 ACOUSTID_ENDPOINT = "https://api.acoustid.org/v2/lookup"
 
 
-def _error_response(error_code: str, detail: str) -> dict[str, Any]:
-    """Return the stable error shape shared by all provider adapters."""
+SAFE_ERROR_MESSAGES = {
+    "configuration_error": "Recognition provider is not configured correctly.",
+    "fpcalc_error": "Acoustic fingerprint generation failed.",
+    "fpcalc_output_error": "Acoustic fingerprint generation returned no fingerprint.",
+    "http_error": "Recognition provider returned an HTTP error.",
+    "local_match_error": "Local fingerprint matching failed.",
+    "malformed_response": "Recognition provider returned an invalid response.",
+    "provider_error": "Recognition provider failed.",
+    "request_error": "Recognition provider request failed.",
+    "timeout": "Recognition provider timed out.",
+}
+
+
+def _error_response(error_code: str, detail: str | None = None) -> dict[str, Any]:
+    """Return a stable public error without exposing provider diagnostics."""
+    del detail
     return {
         "status": "error",
         "error_code": error_code,
-        "error": detail,
+        "error": SAFE_ERROR_MESSAGES.get(error_code, SAFE_ERROR_MESSAGES["provider_error"]),
     }
 
 
@@ -80,12 +94,14 @@ def _match_audio_audd(clip: AudioClip, config: AppConfig, timeout: int = 15) -> 
             files["file"].close()
 
         if resp.status_code != 200:
-            return _error_response("http_error", f"AudD HTTP {resp.status_code}")
+            logging.warning("AudD returned HTTP status %s", resp.status_code)
+            return _error_response("http_error")
 
         try:
             body = resp.json()
-        except (TypeError, ValueError) as exc:
-            return _error_response("malformed_response", f"AudD returned invalid JSON: {exc}")
+        except (TypeError, ValueError):
+            logging.exception("AudD returned invalid JSON")
+            return _error_response("malformed_response")
         res = body.get("result")
         if not res:
             return {"status": "no_match", "result": None}
@@ -105,12 +121,15 @@ def _match_audio_audd(clip: AudioClip, config: AppConfig, timeout: int = 15) -> 
             "image": image,
         }
 
-    except requests.Timeout as exc:
-        return _error_response("timeout", f"AudD request timed out: {exc}")
-    except requests.RequestException as exc:
-        return _error_response("request_error", f"AudD request failed: {exc}")
-    except Exception as exc:
-        return _error_response("provider_error", f"AudD provider error: {exc}")
+    except requests.Timeout:
+        logging.exception("AudD request timed out")
+        return _error_response("timeout")
+    except requests.RequestException:
+        logging.exception("AudD request failed")
+        return _error_response("request_error")
+    except Exception:
+        logging.exception("AudD provider failed")
+        return _error_response("provider_error")
     finally:
         try:
             os.unlink(tmp.name)
@@ -139,7 +158,13 @@ def _public_response(response: dict[str, Any]) -> dict[str, Any]:
         "offset_frames", "backend", "attempts",
     }
     public = {key: value for key, value in response.items() if key in allowed and value is not None}
+    if response.get("status") == "error":
+        code = response.get("error_code", "provider_error")
+        public["error_code"] = code
+        public["error"] = SAFE_ERROR_MESSAGES.get(code, SAFE_ERROR_MESSAGES["provider_error"])
     if response.get("status") == "no_match":
+        public.pop("error", None)
+        public.pop("error_code", None)
         public["result"] = None
     return public
 
@@ -171,9 +196,10 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
 
     for backend, provider in providers:
         try:
-            response = dict(provider(clip, config, timeout=timeout))
-        except Exception as exc:  # defensive boundary for provider adapters
-            response = _error_response("provider_error", "Recognition provider failed.")
+            response = dict(provider(normalized, config, timeout=timeout))
+        except Exception:
+            logging.exception("%s provider failed", backend)
+            response = _error_response("provider_error")
 
         if response.get("status") == "no_token":
             response = {
@@ -181,9 +207,9 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
                 "error_code": f"{backend}_not_configured",
                 "error": f"{backend} is not configured.",
             }
+        response = _public_response(response)
         response["backend"] = backend
         attempts.append(_attempt_summary(backend, response))
-        response = _public_response(response)
         last_response = response
 
         if response.get("status") == "matched":
@@ -224,16 +250,13 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
 
         if not fpcalc_exe:
             logging.error("fpcalc not found; install Chromaprint or set FP_CALC_PATH in .env")
-            return _error_response(
-                "configuration_error",
-                "fpcalc not found; install Chromaprint or set FP_CALC_PATH in .env",
-            )
+            return _error_response("configuration_error")
 
         fpcalc_cmd = [fpcalc_exe, str(tmp.name)]
         proc = subprocess.run(fpcalc_cmd, capture_output=True, text=True, timeout=timeout)
         if proc.returncode != 0:
             logging.error("fpcalc failed: %s", proc.stderr.strip())
-            return _error_response("fpcalc_error", f"fpcalc failed: {proc.stderr.strip()}")
+            return _error_response("fpcalc_error")
 
         fingerprint = None
         duration = None
@@ -266,12 +289,13 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
         resp = requests.get(ACOUSTID_ENDPOINT, params=params, timeout=timeout)
         if resp.status_code != 200:
             logging.error("AcoustID HTTP error: %s", resp.status_code)
-            return _error_response("http_error", f"AcoustID HTTP {resp.status_code}")
+            return _error_response("http_error")
 
         try:
             body = resp.json()
-        except (TypeError, ValueError) as exc:
-            return _error_response("malformed_response", f"AcoustID returned invalid JSON: {exc}")
+        except (TypeError, ValueError):
+            logging.exception("AcoustID returned invalid JSON")
+            return _error_response("malformed_response")
         results = body.get("results") or []
         if not results:
             logging.info("AcoustID returned no match")
@@ -304,14 +328,18 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
             "image": None,
         }
 
-    except subprocess.TimeoutExpired as exc:
-        return _error_response("timeout", f"AcoustID fingerprinting timed out: {exc}")
-    except requests.Timeout as exc:
-        return _error_response("timeout", f"AcoustID request timed out: {exc}")
-    except requests.RequestException as exc:
-        return _error_response("request_error", f"AcoustID request failed: {exc}")
-    except Exception as exc:
-        return _error_response("provider_error", f"AcoustID provider error: {exc}")
+    except subprocess.TimeoutExpired:
+        logging.exception("AcoustID fingerprinting timed out")
+        return _error_response("timeout")
+    except requests.Timeout:
+        logging.exception("AcoustID request timed out")
+        return _error_response("timeout")
+    except requests.RequestException:
+        logging.exception("AcoustID request failed")
+        return _error_response("request_error")
+    except Exception:
+        logging.exception("AcoustID provider failed")
+        return _error_response("provider_error")
     finally:
         try:
             os.unlink(tmp.name)
@@ -352,12 +380,14 @@ def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) ->
         )
 
         if resp.status_code != 200:
-            return _error_response("http_error", f"RapidAPI HTTP {resp.status_code}")
+            logging.warning("RapidAPI returned HTTP status %s", resp.status_code)
+            return _error_response("http_error")
 
         try:
             body = resp.json()
-        except (TypeError, ValueError) as exc:
-            return _error_response("malformed_response", f"RapidAPI returned invalid JSON: {exc}")
+        except (TypeError, ValueError):
+            logging.exception("RapidAPI returned invalid JSON")
+            return _error_response("malformed_response")
 
         track = body.get("track")
         if not track:
@@ -384,12 +414,15 @@ def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) ->
             "image": image,
         }
 
-    except requests.Timeout as exc:
-        return _error_response("timeout", f"RapidAPI request timed out: {exc}")
-    except requests.RequestException as exc:
-        return _error_response("request_error", f"RapidAPI request failed: {exc}")
-    except Exception as exc:
-        return _error_response("provider_error", f"RapidAPI provider error: {exc}")
+    except requests.Timeout:
+        logging.exception("RapidAPI request timed out")
+        return _error_response("timeout")
+    except requests.RequestException:
+        logging.exception("RapidAPI request failed")
+        return _error_response("request_error")
+    except Exception:
+        logging.exception("RapidAPI provider failed")
+        return _error_response("provider_error")
     finally:
         try:
             os.unlink(tmp.name)
@@ -403,6 +436,7 @@ def match_audio_local(clip: AudioClip, config: AppConfig, timeout: int = 15) -> 
     if not config.fingerprint_index_path:
         return {"status": "no_token"}
     try:
-        return match_local_index(clip, config.fingerprint_index_path)
-    except Exception as exc:
-        return _error_response("local_match_error", str(exc))
+        return _public_response(match_local_index(clip, config.fingerprint_index_path))
+    except Exception:
+        logging.exception("Local fingerprint matching failed")
+        return _error_response("local_match_error")

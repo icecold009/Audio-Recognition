@@ -200,21 +200,25 @@ def record_microphone(
     *,
     config: AppConfig | None = None,
 ) -> AudioClip:
+    cfg = config or AppConfig(audd_api_token="")
+    if duration_seconds <= 0:
+        raise AudioInputError("invalid_duration", "Recording duration must be greater than zero.")
+    if duration_seconds < cfg.min_audio_seconds:
+        raise AudioInputError("too_short", "Audio is shorter than the minimum duration.")
+    if duration_seconds > cfg.max_audio_seconds:
+        raise AudioInputError("too_long", "Audio exceeds the maximum duration.")
+    if sample_rate <= 0:
+        raise AudioInputError("invalid_sample_rate", "Audio sample rate must be greater than zero.")
+
     try:
         import sounddevice as sd
     except ImportError as exc:  # pragma: no cover - depends on local environment
         raise RuntimeError("Microphone recording requires the 'sounddevice' package") from exc
 
-    if duration_seconds <= 0:
-        raise AudioInputError("invalid_duration", "Recording duration must be greater than zero.")
-    if sample_rate <= 0:
-        raise AudioInputError("invalid_sample_rate", "Audio sample rate must be greater than zero.")
-
     frame_count = int(duration_seconds * sample_rate)
     print(f"Recording {duration_seconds} seconds from microphone...")
     audio_data = sd.rec(frame_count, samplerate=sample_rate, channels=1, dtype="float32")
     sd.wait()
-    cfg = config or AppConfig(audd_api_token="")
     return normalize_audio(
         audio_data,
         sample_rate,

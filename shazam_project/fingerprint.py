@@ -204,7 +204,6 @@ def match_local_index(
         return {
             "status": "no_match",
             "result": None,
-            "error": "no fingerprint landmarks extracted",
         }
 
     votes: Counter[tuple[str, int]] = Counter()

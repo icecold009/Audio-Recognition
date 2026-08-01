@@ -33,7 +33,7 @@ def test_status_documents_shared_audio_contract(monkeypatch):
     body = response.get_json()
     assert response.status_code == 200
     assert body["internal_sample_rate"] == 16000
-    assert body["internal_sample_width"] == 2
+    assert "internal_sample_width" not in body
     assert body["min_audio_seconds"] == 1.0
     assert "mp3" in body["supported_formats"]
 
@@ -67,6 +67,27 @@ def test_missing_and_malformed_uploads_are_invalid_audio(monkeypatch, tmp_path):
     )
     assert malformed.status_code == 400
     assert malformed.get_json()["error_code"] == "malformed_wav"
+
+
+def test_rate_limited_request_does_not_load_or_save_upload(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_app, "INTERNAL_API_SECRET", "")
+    monkeypatch.setattr(
+        web_app,
+        "_check_rate_limits",
+        lambda _ip: {
+            "blocked": True,
+            "status_code": 429,
+            "payload": {"status": "rate_limited", "error_code": "cooldown", "error": "Please wait before trying again."},
+        },
+    )
+    loader = patch.object(web_app, "_load_web_upload")
+    with loader as load_upload:
+        response = web_app.app.test_client().post(
+            "/api/match", data=_upload(tmp_path), content_type="multipart/form-data"
+        )
+    assert response.status_code == 429
+    assert response.get_json()["status"] == "rate_limited"
+    load_upload.assert_not_called()
 
 
 def test_oversized_upload_is_rejected_before_decoding(monkeypatch, tmp_path):
