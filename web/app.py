@@ -46,6 +46,20 @@ CLIENT_ID_HMAC_SECRET = os.getenv("CLIENT_ID_HMAC_SECRET", "")
 APP_ENV = os.getenv("APP_ENV", "production").strip().lower()
 
 
+def _log_supabase_failure(operation: str, error_code: str) -> None:
+    logging.error("supabase_failure operation=%s error_code=%s", operation, error_code)
+
+
+def _create_supabase_client() -> Client | None:
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        return None
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    except Exception:
+        _log_supabase_failure("client_initialization", "client_initialization_failed")
+        return None
+
+
 def _int_env(name: str, default: int) -> int:
     try:
         return int(os.getenv(name, str(default)))
@@ -63,11 +77,7 @@ _DEVELOPMENT_HMAC_SECRET = secrets.token_bytes(32)
 
 supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    except Exception:
-        logging.exception("Supabase client initialization failed")
-        supabase = None
+    supabase = _create_supabase_client()
 
 DAILY_LIMIT = max(1, _int_env("DAILY_LIMIT", 15))
 MONTHLY_LIMIT = max(1, _int_env("MONTHLY_LIMIT", 475))
@@ -261,7 +271,7 @@ def _check_rate_limits(client_id_hash: str) -> dict:
             return {"blocked": False}
         return _quota_limit_decision(data)
     except Exception:
-        logging.exception("Supabase quota preflight failed")
+        _log_supabase_failure("quota_preflight", "quota_preflight_failed")
         return {"service_error": True}
 
 
@@ -306,7 +316,7 @@ def _consume_quota(client_id_hash: str) -> dict:
             return {"blocked": False}
         return _quota_limit_decision(data)
     except Exception:
-        logging.exception("Supabase quota RPC failed")
+        _log_supabase_failure("quota_consumption", "quota_consumption_failed")
         return {"service_error": True}
 
 

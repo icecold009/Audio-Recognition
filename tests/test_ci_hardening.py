@@ -134,10 +134,14 @@ def test_rate_limit_response_stops_processing(monkeypatch):
     loader.assert_not_called()
 
 
-def test_supabase_failure_fails_closed_without_leaking_details(monkeypatch, caplog):
+def test_supabase_failures_fail_closed_without_leaking_details(monkeypatch, caplog):
+    private_text = (
+        "https://private-db.example/project?service_role=credential C:\\private\\db\\trace"
+    )
+
     class BrokenSupabase:
         def rpc(self, *_args, **_kwargs):
-            raise RuntimeError("supabase private endpoint")
+            raise RuntimeError(private_text)
 
     monkeypatch.setattr(web_app, "load_config", lambda: config())
     monkeypatch.setattr(web_app, "APP_ENV", "production")
@@ -153,7 +157,47 @@ def test_supabase_failure_fails_closed_without_leaking_details(monkeypatch, capl
 
     assert response.status_code == 503
     assert response.get_json()["error_code"] == "quota_unavailable"
-    assert "supabase private endpoint" not in response.get_data(as_text=True)
+    assert private_text not in response.get_data(as_text=True)
+    assert private_text not in caplog.text
+
+    init_private_text = (
+        "postgres://private-user:credential@private-db.example:5432/app C:\\private\\init"
+    )
+    monkeypatch.setattr(web_app, "SUPABASE_URL", "https://private-db.example/project")
+    monkeypatch.setattr(web_app, "SUPABASE_SERVICE_ROLE_KEY", "service-role-secret")
+    monkeypatch.setattr(
+        web_app, "create_client", MagicMock(side_effect=RuntimeError(init_private_text))
+    )
+
+    with caplog.at_level("ERROR"):
+        client = web_app._create_supabase_client()
+
+    assert client is None
+    assert init_private_text not in caplog.text
+    assert "client_initialization" in caplog.text
+    assert "client_initialization_failed" in caplog.text
+
+    consumption_private_text = (
+        "postgres error at https://private-db.example/project C:\\private\\quota"
+    )
+
+    class BrokenSupabase:
+        def rpc(self, *_args, **_kwargs):
+            raise RuntimeError(consumption_private_text)
+
+    monkeypatch.setattr(web_app, "APP_ENV", "production")
+    monkeypatch.setattr(web_app, "SUPABASE_URL", "https://project.supabase.co")
+    monkeypatch.setattr(web_app, "SUPABASE_SERVICE_ROLE_KEY", "server-only")
+    monkeypatch.setattr(web_app, "CLIENT_ID_HMAC_SECRET", "separate-secret")
+    monkeypatch.setattr(web_app, "supabase", BrokenSupabase())
+
+    with caplog.at_level("ERROR"):
+        result = web_app._consume_quota("a" * 64)
+
+    assert result == {"service_error": True}
+    assert consumption_private_text not in caplog.text
+    assert "quota_consumption" in caplog.text
+    assert "quota_consumption_failed" in caplog.text
 
 
 def test_missing_backend_configuration_is_visible_without_credentials(monkeypatch):
