@@ -9,7 +9,7 @@ from shazam_project.config import AppConfig
 from web import app as web_app
 
 
-def _wav_bytes(duration_seconds: float = 0.1, sample_rate: int = 8000) -> bytes:
+def _wav_bytes(duration_seconds: float = 1.5, sample_rate: int = 8000) -> bytes:
     frame_count = int(duration_seconds * sample_rate)
     payload = b"\x00\x00" * frame_count
     output = BytesIO()
@@ -58,7 +58,7 @@ class WebRouteTests(unittest.TestCase):
         with patch.object(web_app, "INTERNAL_API_SECRET", ""):
             response = self.client.post("/api/match")
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json()["status"], "error")
+        self.assertEqual(response.get_json()["status"], "invalid_audio")
 
     def test_match_accepts_configured_browser_origin_without_exposing_secret(self):
         cfg = AppConfig(audd_api_token="TOKEN")
@@ -100,7 +100,7 @@ class WebRouteTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json()["status"], "error")
+        self.assertEqual(response.get_json()["status"], "invalid_audio")
 
     def test_match_rejects_unknown_origin_without_secret(self):
         with patch.object(web_app, "INTERNAL_API_SECRET", "server-only-secret"):
@@ -113,10 +113,10 @@ class WebRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_match_rejects_audio_over_duration_limit(self):
-        cfg = AppConfig(audd_api_token="TOKEN")
-        with patch.object(web_app, "MAX_AUDIO_SECONDS", 0), patch.object(
-            web_app, "load_config", return_value=cfg
-        ), patch.object(web_app.matcher, "match_audio") as match_mock:
+        cfg = AppConfig(audd_api_token="TOKEN", max_audio_seconds=0)
+        with patch.object(web_app, "load_config", return_value=cfg), patch.object(
+            web_app.matcher, "match_audio"
+        ) as match_mock:
             response = self.client.post(
                 "/api/match",
                 data={"file": (BytesIO(_wav_bytes()), "sample.wav")},
@@ -136,7 +136,7 @@ class WebRouteTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 413)
-        self.assertEqual(response.get_json()["status"], "error")
+        self.assertEqual(response.get_json()["status"], "invalid_audio")
 
 
 if __name__ == "__main__":

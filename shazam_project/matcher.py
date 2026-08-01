@@ -16,7 +16,7 @@ import requests
 
 from .config import AppConfig
 from .fingerprint import match_local_index
-from .recorder import AudioClip
+from .recorder import AudioClip, AudioInputError, normalize_audio
 
 
 AUDD_ENDPOINT = "https://api.audd.io/"
@@ -64,6 +64,9 @@ def _extract_audd_image(body: dict[str, Any]) -> str | None:
 
 def _match_audio_audd(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
     """Match a clip with AudD and return the shared result shape."""
+    if not config.audd_api_token:
+        logging.debug("AudD API token not configured")
+        return {"status": "no_token"}
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
     tmp.close()
     try:
@@ -128,25 +131,37 @@ def _attempt_summary(backend: str, response: dict[str, Any]) -> dict[str, Any]:
     return summary
 
 
+def _public_response(response: dict[str, Any]) -> dict[str, Any]:
+    """Keep provider payloads and local paths out of the public contract."""
+    allowed = {
+        "status", "error_code", "error", "title", "artist", "album", "genre",
+        "image", "score", "votes", "fingerprint_hashes", "matched_hashes",
+        "offset_frames", "backend", "attempts",
+    }
+    return {key: value for key, value in response.items() if key in allowed and value is not None}
+
+
 def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
-    """Try configured providers in order and fall back after errors or no-match.
+    """Normalize once, then try every backend in the documented fallback order."""
+    try:
+        normalized = normalize_audio(
+            clip.samples,
+            clip.sample_rate,
+            source=clip.source,
+            target_sample_rate=config.internal_sample_rate,
+            min_audio_seconds=config.min_audio_seconds,
+            max_audio_seconds=config.max_audio_seconds,
+            path=clip.path,
+        )
+    except AudioInputError as exc:
+        return {"status": "invalid_audio", "error_code": exc.code, "error": exc.message}
 
-    Provider-specific functions keep their normalized response shape. This
-    dispatcher adds the selected backend and non-sensitive attempt summaries
-    so callers can explain which path produced the result.
-    """
-    providers: list[tuple[str, Any]] = []
-    if config.rapidapi_key:
-        providers.append(("rapidapi", match_audio_shazam))
-    if config.acoustid_api_key:
-        providers.append(("acoustid", match_audio_acoustid))
-    if config.audd_api_token:
-        providers.append(("audd", _match_audio_audd))
-    if config.fingerprint_index_path:
-        providers.append(("local", match_audio_local))
-
-    if not providers:
-        return {"status": "no_token", "attempts": []}
+    providers: list[tuple[str, Any]] = [
+        ("rapidapi", match_audio_shazam),
+        ("acoustid", match_audio_acoustid),
+        ("audd", _match_audio_audd),
+        ("local", match_audio_local),
+    ]
 
     attempts: list[dict[str, Any]] = []
     last_response: dict[str, Any] = {"status": "error", "error": "No provider response"}
@@ -155,20 +170,34 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
         try:
             response = dict(provider(clip, config, timeout=timeout))
         except Exception as exc:  # defensive boundary for provider adapters
-            response = _error_response("provider_error", str(exc))
+            response = _error_response("provider_error", "Recognition provider failed.")
 
+        if response.get("status") == "no_token":
+            response = {
+                "status": "not_configured",
+                "error_code": f"{backend}_not_configured",
+                "error": f"{backend} is not configured.",
+            }
         response["backend"] = backend
         attempts.append(_attempt_summary(backend, response))
+        response = _public_response(response)
         last_response = response
 
         if response.get("status") == "matched":
             response["attempts"] = attempts
             return response
 
-        if response.get("status") not in {"error", "no_match", "no_token"}:
+        if response.get("status") not in {"error", "no_match", "no_token", "not_configured"}:
             response["attempts"] = attempts
             return response
 
+    if all(item["status"] == "not_configured" for item in attempts):
+        return {
+            "status": "not_configured",
+            "error_code": "no_backend_configured",
+            "error": "No recognition provider is configured.",
+            "attempts": attempts,
+        }
     last_response["attempts"] = attempts
     return last_response
 
