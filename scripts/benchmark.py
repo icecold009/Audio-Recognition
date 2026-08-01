@@ -2,18 +2,17 @@ from __future__ import annotations
 
 import argparse
 import csv
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import statistics
 import time
-from typing import Any, Callable
 import unicodedata
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
 
 from shazam_project import matcher
 from shazam_project.config import AppConfig, load_config
 from shazam_project.recorder import load_audio_file
-
 
 BACKENDS: dict[str, tuple[str, Callable[..., dict[str, Any]], str]] = {
     "rapidapi": ("RapidAPI/Shazam", matcher.match_audio_shazam, "rapidapi_key"),
@@ -82,8 +81,10 @@ def _run_backend(
     elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
     title = result.get("title")
     artist = result.get("artist")
-    correct = status == "matched" and _matches(title, row["expected_title"]) and _matches(
-        artist, row["expected_artist"]
+    correct = (
+        status == "matched"
+        and _matches(title, row["expected_title"])
+        and _matches(artist, row["expected_artist"])
     )
     base.update(
         {
@@ -141,7 +142,9 @@ def _aggregate(records: list[dict[str, Any]], backend: str) -> dict[str, Any]:
         "latency_ms": {
             "mean": round(statistics.mean(latencies), 2) if latencies else None,
             "median": round(statistics.median(latencies), 2) if latencies else None,
-            "p95": round(sorted(latencies)[max(0, int(len(latencies) * 0.95) - 1)], 2) if latencies else None,
+            "p95": round(sorted(latencies)[max(0, int(len(latencies) * 0.95) - 1)], 2)
+            if latencies
+            else None,
         },
         "by_clip_length": by_length,
         "failures": failures,
@@ -194,7 +197,9 @@ def run(manifest_path: Path, output_path: Path, timeout: int, env_path: Path) ->
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run all configured music-recognition backends against a manifest.")
+    parser = argparse.ArgumentParser(
+        description="Run all configured music-recognition backends against a manifest."
+    )
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=Path("evaluation/results/benchmark.json"))
     parser.add_argument("--timeout", type=int, default=15)

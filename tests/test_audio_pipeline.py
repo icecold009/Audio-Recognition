@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from io import BytesIO
-from pathlib import Path
 import sys
 import tempfile
 import wave
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -160,16 +159,18 @@ def test_ffmpeg_timeout_and_failure_are_stable(tmp_path):
     source = tmp_path / "input.mp3"
     output = tmp_path / "output.wav"
     source.write_bytes(b"audio")
-    with patch("shazam_project.recorder.shutil.which", return_value="ffmpeg"), patch(
-        "shazam_project.recorder.subprocess.run", side_effect=subprocess_timeout()
+    with (
+        patch("shazam_project.recorder.shutil.which", return_value="ffmpeg"),
+        patch("shazam_project.recorder.subprocess.run", side_effect=subprocess_timeout()),
     ):
         with pytest.raises(AudioInputError) as timeout_error:
             convert_with_ffmpeg(source, output, sample_rate=44100, timeout=1)
     assert timeout_error.value.code == "ffmpeg_timeout"
 
     failed = MagicMock(returncode=1)
-    with patch("shazam_project.recorder.shutil.which", return_value="ffmpeg"), patch(
-        "shazam_project.recorder.subprocess.run", return_value=failed
+    with (
+        patch("shazam_project.recorder.shutil.which", return_value="ffmpeg"),
+        patch("shazam_project.recorder.subprocess.run", return_value=failed),
     ):
         with pytest.raises(AudioInputError) as failure_error:
             convert_with_ffmpeg(source, output, sample_rate=44100, timeout=1)
@@ -212,7 +213,9 @@ def test_matcher_passes_normalized_clip_to_every_provider():
 
 
 def test_provider_diagnostics_do_not_leak_paths_or_exception_details():
-    clip = AudioClip(valid_samples(44100), 44100, "provider-test", path=Path(r"C:\private\source.wav"))
+    clip = AudioClip(
+        valid_samples(44100), 44100, "provider-test", path=Path(r"C:\private\source.wav")
+    )
     cfg = config(rapidapi_key="KEY")
     leaked = r"C:\private\tmp\provider-secret: raw fpcalc stderr"
 
@@ -257,11 +260,17 @@ def test_record_microphone_rejects_configured_duration_limits_before_recording(d
 def test_matcher_fallback_order_continues_after_no_match_and_error():
     clip = AudioClip(valid_samples(16000), 16000, "test")
     cfg = config(rapidapi_key="rapid", acoustid_api_key="acoustic", fingerprint_index_path="index")
-    with patch.object(matcher, "match_audio_shazam", return_value={"status": "no_match"}) as rapid, patch.object(
-        matcher, "match_audio_acoustid", return_value={"status": "error", "error_code": "timeout"}
-    ) as acoustid, patch.object(
-        matcher, "_match_audio_audd", return_value={"status": "matched", "title": "Song"}
-    ) as audd:
+    with (
+        patch.object(matcher, "match_audio_shazam", return_value={"status": "no_match"}) as rapid,
+        patch.object(
+            matcher,
+            "match_audio_acoustid",
+            return_value={"status": "error", "error_code": "timeout"},
+        ) as acoustid,
+        patch.object(
+            matcher, "_match_audio_audd", return_value={"status": "matched", "title": "Song"}
+        ) as audd,
+    ):
         result = matcher.match_audio(clip, cfg)
     assert result["status"] == "matched"
     assert result["backend"] == "audd"
@@ -282,8 +291,9 @@ def test_provider_temp_file_is_removed_on_timeout():
         captured.append(handle.name)
         return handle
 
-    with patch("shazam_project.recorder.tempfile.NamedTemporaryFile", side_effect=capture_tempfile), patch(
-        "shazam_project.matcher.requests.post", side_effect=requests.Timeout()
+    with (
+        patch("shazam_project.recorder.tempfile.NamedTemporaryFile", side_effect=capture_tempfile),
+        patch("shazam_project.matcher.requests.post", side_effect=requests.Timeout()),
     ):
         response = matcher.match_audio_shazam(clip, cfg)
     assert response["status"] == "error"
@@ -297,7 +307,14 @@ def test_local_fingerprint_index_matches_same_clip(tmp_path):
     )
     source = write_wav(tmp_path / "track.wav", samples, sample_rate=sample_rate)
     index = build_index(
-        [{"track_id": "track-1", "audio_path": str(source), "title": "Test Song", "artist": "Tester"}],
+        [
+            {
+                "track_id": "track-1",
+                "audio_path": str(source),
+                "title": "Test Song",
+                "artist": "Tester",
+            }
+        ],
         tmp_path / "index.json",
     )
     clip = load_audio_file(source)

@@ -4,12 +4,12 @@ import base64
 import json
 import logging
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-from typing import Any
 import wave
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import requests
@@ -17,7 +17,6 @@ import requests
 from .config import AppConfig
 from .fingerprint import match_local_index
 from .recorder import AudioClip, AudioInputError, normalize_audio
-
 
 AUDD_ENDPOINT = "https://api.audd.io/"
 ACOUSTID_ENDPOINT = "https://api.acoustid.org/v2/lookup"
@@ -100,7 +99,7 @@ def _match_audio_audd(clip: AudioClip, config: AppConfig, timeout: int = 15) -> 
         try:
             body = resp.json()
         except (TypeError, ValueError):
-            logging.exception("AudD returned invalid JSON")
+            logging.error("AudD returned invalid JSON")
             return _error_response("malformed_response")
         res = body.get("result")
         if not res:
@@ -122,13 +121,13 @@ def _match_audio_audd(clip: AudioClip, config: AppConfig, timeout: int = 15) -> 
         }
 
     except requests.Timeout:
-        logging.exception("AudD request timed out")
+        logging.error("AudD request timed out")
         return _error_response("timeout")
     except requests.RequestException:
-        logging.exception("AudD request failed")
+        logging.error("AudD request failed")
         return _error_response("request_error")
     except Exception:
-        logging.exception("AudD provider failed")
+        logging.error("AudD provider failed")
         return _error_response("provider_error")
     finally:
         try:
@@ -153,9 +152,21 @@ def _attempt_summary(backend: str, response: dict[str, Any]) -> dict[str, Any]:
 def _public_response(response: dict[str, Any]) -> dict[str, Any]:
     """Keep provider payloads and local paths out of the public contract."""
     allowed = {
-        "status", "error_code", "error", "title", "artist", "album", "genre",
-        "image", "score", "votes", "fingerprint_hashes", "matched_hashes",
-        "offset_frames", "backend", "attempts",
+        "status",
+        "error_code",
+        "error",
+        "title",
+        "artist",
+        "album",
+        "genre",
+        "image",
+        "score",
+        "votes",
+        "fingerprint_hashes",
+        "matched_hashes",
+        "offset_frames",
+        "backend",
+        "attempts",
     }
     public = {key: value for key, value in response.items() if key in allowed and value is not None}
     if response.get("status") == "error":
@@ -198,7 +209,7 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
         try:
             response = dict(provider(normalized, config, timeout=timeout))
         except Exception:
-            logging.exception("%s provider failed", backend)
+            logging.error("%s provider failed", backend)
             response = _error_response("provider_error")
 
         if response.get("status") == "no_token":
@@ -255,7 +266,7 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
         fpcalc_cmd = [fpcalc_exe, str(tmp.name)]
         proc = subprocess.run(fpcalc_cmd, capture_output=True, text=True, timeout=timeout)
         if proc.returncode != 0:
-            logging.error("fpcalc failed: %s", proc.stderr.strip())
+            logging.error("fpcalc failed with exit code %s", proc.returncode)
             return _error_response("fpcalc_error")
 
         fingerprint = None
@@ -276,7 +287,9 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
 
         if not fingerprint or not duration:
             logging.error("Could not obtain fingerprint from fpcalc")
-            return _error_response("fpcalc_output_error", "Could not obtain fingerprint from fpcalc")
+            return _error_response(
+                "fpcalc_output_error", "Could not obtain fingerprint from fpcalc"
+            )
 
         params = {
             "client": config.acoustid_api_key,
@@ -294,7 +307,7 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
         try:
             body = resp.json()
         except (TypeError, ValueError):
-            logging.exception("AcoustID returned invalid JSON")
+            logging.error("AcoustID returned invalid JSON")
             return _error_response("malformed_response")
         results = body.get("results") or []
         if not results:
@@ -329,16 +342,16 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
         }
 
     except subprocess.TimeoutExpired:
-        logging.exception("AcoustID fingerprinting timed out")
+        logging.error("AcoustID fingerprinting timed out")
         return _error_response("timeout")
     except requests.Timeout:
-        logging.exception("AcoustID request timed out")
+        logging.error("AcoustID request timed out")
         return _error_response("timeout")
     except requests.RequestException:
-        logging.exception("AcoustID request failed")
+        logging.error("AcoustID request failed")
         return _error_response("request_error")
     except Exception:
-        logging.exception("AcoustID provider failed")
+        logging.error("AcoustID provider failed")
         return _error_response("provider_error")
     finally:
         try:
@@ -386,7 +399,7 @@ def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) ->
         try:
             body = resp.json()
         except (TypeError, ValueError):
-            logging.exception("RapidAPI returned invalid JSON")
+            logging.error("RapidAPI returned invalid JSON")
             return _error_response("malformed_response")
 
         track = body.get("track")
@@ -415,13 +428,13 @@ def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) ->
         }
 
     except requests.Timeout:
-        logging.exception("RapidAPI request timed out")
+        logging.error("RapidAPI request timed out")
         return _error_response("timeout")
     except requests.RequestException:
-        logging.exception("RapidAPI request failed")
+        logging.error("RapidAPI request failed")
         return _error_response("request_error")
     except Exception:
-        logging.exception("RapidAPI provider failed")
+        logging.error("RapidAPI provider failed")
         return _error_response("provider_error")
     finally:
         try:
@@ -438,5 +451,5 @@ def match_audio_local(clip: AudioClip, config: AppConfig, timeout: int = 15) -> 
     try:
         return _public_response(match_local_index(clip, config.fingerprint_index_path))
     except Exception:
-        logging.exception("Local fingerprint matching failed")
+        logging.error("Local fingerprint matching failed")
         return _error_response("local_match_error")

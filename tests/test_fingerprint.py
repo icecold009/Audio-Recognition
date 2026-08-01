@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
 import tempfile
 import unittest
 import wave
+from pathlib import Path
 
 import numpy as np
 
@@ -49,8 +49,18 @@ class FingerprintTests(unittest.TestCase):
 
             build_index(
                 [
-                    {"track_id": "a", "audio_path": str(track_a), "title": "Track A", "artist": "Artist A"},
-                    {"track_id": "b", "audio_path": str(track_b), "title": "Track B", "artist": "Artist B"},
+                    {
+                        "track_id": "a",
+                        "audio_path": str(track_a),
+                        "title": "Track A",
+                        "artist": "Artist A",
+                    },
+                    {
+                        "track_id": "b",
+                        "audio_path": str(track_b),
+                        "title": "Track B",
+                        "artist": "Artist B",
+                    },
                 ],
                 index,
             )

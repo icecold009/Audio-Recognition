@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import dataclass
-from pathlib import Path
+import logging
 import shutil
 import subprocess
 import tempfile
 import wave
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from scipy.signal import resample_poly
 
 from .config import AppConfig
-
 
 SUPPORTED_WAV_SAMPLE_WIDTHS = frozenset({1, 2, 4})
 DEFAULT_SAMPLE_RATE = 44100
@@ -100,14 +100,20 @@ def normalize_audio(
     except (TypeError, ValueError) as exc:
         raise AudioInputError("invalid_sample_rate", "Internal sample rate is invalid.") from exc
     if target_rate <= 0:
-        raise AudioInputError("invalid_sample_rate", "Internal sample rate must be greater than zero.") from None
+        raise AudioInputError(
+            "invalid_sample_rate", "Internal sample rate must be greater than zero."
+        ) from None
 
     mono = _to_mono_float32(np.asarray(samples))
     duration = mono.size / rate
     if duration < float(min_audio_seconds):
-        raise AudioInputError("too_short", f"Audio must be at least {min_audio_seconds:g} seconds long.")
+        raise AudioInputError(
+            "too_short", f"Audio must be at least {min_audio_seconds:g} seconds long."
+        )
     if duration > float(max_audio_seconds):
-        raise AudioInputError("too_long", f"Audio must be no longer than {max_audio_seconds:g} seconds.")
+        raise AudioInputError(
+            "too_long", f"Audio must be no longer than {max_audio_seconds:g} seconds."
+        )
 
     normalized = _resample(mono, rate, target_rate)
     if normalized.size == 0:
@@ -165,7 +171,9 @@ def load_audio_file(
             frame_count = audio_file.getnframes()
             raw_audio = audio_file.readframes(frame_count)
     except (wave.Error, EOFError, OSError) as exc:
-        raise AudioInputError("malformed_wav", "The WAV header or audio data is malformed.") from exc
+        raise AudioInputError(
+            "malformed_wav", "The WAV header or audio data is malformed."
+        ) from exc
 
     if sample_rate <= 0:
         raise AudioInputError("invalid_sample_rate", "Audio sample rate must be greater than zero.")
@@ -201,13 +209,21 @@ def record_microphone(
     config: AppConfig | None = None,
 ) -> AudioClip:
     cfg = config or AppConfig(audd_api_token="")
-    if duration_seconds <= 0:
+    try:
+        duration = float(duration_seconds)
+    except (TypeError, ValueError) as exc:
+        raise AudioInputError("invalid_duration", "Recording duration is invalid.") from exc
+    if duration <= 0:
         raise AudioInputError("invalid_duration", "Recording duration must be greater than zero.")
-    if duration_seconds < cfg.min_audio_seconds:
+    if duration < cfg.min_audio_seconds:
         raise AudioInputError("too_short", "Audio is shorter than the minimum duration.")
-    if duration_seconds > cfg.max_audio_seconds:
+    if duration > cfg.max_audio_seconds:
         raise AudioInputError("too_long", "Audio exceeds the maximum duration.")
-    if sample_rate <= 0:
+    try:
+        rate = int(sample_rate)
+    except (TypeError, ValueError) as exc:
+        raise AudioInputError("invalid_sample_rate", "Audio sample rate is invalid.") from exc
+    if rate <= 0:
         raise AudioInputError("invalid_sample_rate", "Audio sample rate must be greater than zero.")
 
     try:
@@ -215,13 +231,25 @@ def record_microphone(
     except ImportError as exc:  # pragma: no cover - depends on local environment
         raise RuntimeError("Microphone recording requires the 'sounddevice' package") from exc
 
-    frame_count = int(duration_seconds * sample_rate)
-    print(f"Recording {duration_seconds} seconds from microphone...")
-    audio_data = sd.rec(frame_count, samplerate=sample_rate, channels=1, dtype="float32")
-    sd.wait()
+    frame_count = int(duration * rate)
+    capture_started = False
+    try:
+        print(f"Recording {duration:g} seconds from microphone...")
+        capture_started = True
+        audio_data = sd.rec(frame_count, samplerate=rate, channels=1, dtype="float32")
+        sd.wait()
+    except Exception as exc:
+        logging.error("Microphone capture failed")
+        raise AudioInputError("recording_failed", "Microphone recording failed.") from exc
+    finally:
+        if capture_started:
+            try:
+                sd.stop()
+            except Exception:
+                logging.error("Microphone cleanup failed")
     return normalize_audio(
         audio_data,
-        sample_rate,
+        rate,
         source="microphone",
         target_sample_rate=cfg.internal_sample_rate,
         min_audio_seconds=cfg.min_audio_seconds,
@@ -229,7 +257,9 @@ def record_microphone(
     )
 
 
-def write_wav(clip: AudioClip, path: str | Path, *, sample_width: int = DEFAULT_SAMPLE_WIDTH) -> Path:
+def write_wav(
+    clip: AudioClip, path: str | Path, *, sample_width: int = DEFAULT_SAMPLE_WIDTH
+) -> Path:
     """Write normalized mono PCM without allowing integer overflow."""
     if sample_width not in SUPPORTED_WAV_SAMPLE_WIDTHS:
         raise AudioInputError("unsupported_sample_width", "Unsupported internal sample width.")
@@ -306,7 +336,9 @@ def convert_with_ffmpeg(
     except OSError as exc:
         raise AudioInputError("ffmpeg_unavailable", "FFmpeg could not be started.") from exc
     if completed.returncode != 0:
-        raise AudioInputError("ffmpeg_conversion_failed", "FFmpeg could not decode this audio file.")
+        raise AudioInputError(
+            "ffmpeg_conversion_failed", "FFmpeg could not decode this audio file."
+        )
     if not Path(output_path).exists() or Path(output_path).stat().st_size == 0:
         raise AudioInputError("ffmpeg_conversion_failed", "FFmpeg produced no audio output.")
     return Path(output_path)

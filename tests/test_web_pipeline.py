@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 from io import BytesIO
-from pathlib import Path
-import tempfile
 from unittest.mock import patch
 
 import pytest
 
-from web import app as web_app
-from shazam_project.config import AppConfig
 from shazam_project.recorder import AudioInputError
+from web import app as web_app
 
 from .test_audio_pipeline import config, valid_samples, write_wav
 
@@ -47,12 +44,24 @@ def test_valid_wav_uses_shared_loader_and_returns_contract(monkeypatch, tmp_path
     monkeypatch.setattr(
         web_app.matcher,
         "match_audio",
-        lambda clip, config: {"status": "matched", "title": "Song", "artist": "Artist", "backend": "local"},
+        lambda clip, config: {
+            "status": "matched",
+            "title": "Song",
+            "artist": "Artist",
+            "backend": "local",
+        },
     )
     web_app.memory_quota_by_client.clear()
-    response = web_app.app.test_client().post("/api/match", data=_upload(tmp_path), content_type="multipart/form-data")
+    response = web_app.app.test_client().post(
+        "/api/match", data=_upload(tmp_path), content_type="multipart/form-data"
+    )
     assert response.status_code == 200
-    assert response.get_json() == {"backend": "local", "status": "matched", "title": "Song", "artist": "Artist"}
+    assert response.get_json() == {
+        "backend": "local",
+        "status": "matched",
+        "title": "Song",
+        "artist": "Artist",
+    }
 
 
 def test_missing_and_malformed_uploads_are_invalid_audio(monkeypatch, tmp_path):
@@ -80,7 +89,11 @@ def test_rate_limited_request_does_not_load_or_save_upload(monkeypatch, tmp_path
         lambda _ip: {
             "blocked": True,
             "status_code": 429,
-            "payload": {"status": "rate_limited", "error_code": "cooldown", "error": "Please wait before trying again."},
+            "payload": {
+                "status": "rate_limited",
+                "error_code": "cooldown",
+                "error": "Please wait before trying again.",
+            },
         },
     )
     loader = patch.object(web_app, "_load_web_upload")
@@ -123,7 +136,9 @@ def test_non_wav_upload_is_converted_by_ffmpeg(monkeypatch, tmp_path):
     monkeypatch.setattr(
         web_app,
         "convert_with_ffmpeg",
-        lambda source, output, sample_rate, timeout: write_wav(output, valid_samples(), sample_rate=8000),
+        lambda source, output, sample_rate, timeout: write_wav(
+            output, valid_samples(), sample_rate=8000
+        ),
     )
     monkeypatch.setattr(web_app.matcher, "match_audio", lambda clip, config: {"status": "no_match"})
     response = web_app.app.test_client().post(
@@ -139,7 +154,9 @@ def test_ffmpeg_timeout_and_failure_are_safe(monkeypatch, tmp_path):
         monkeypatch.setattr(
             web_app,
             "convert_with_ffmpeg",
-            lambda *args, code=code, **kwargs: (_ for _ in ()).throw(AudioInputError(code, "stable failure")),
+            lambda *args, code=code, **kwargs: (_ for _ in ()).throw(
+                AudioInputError(code, "stable failure")
+            ),
         )
         response = web_app.app.test_client().post(
             "/api/match", data=_upload(tmp_path, "clip.mp3"), content_type="multipart/form-data"
@@ -151,11 +168,19 @@ def test_ffmpeg_timeout_and_failure_are_safe(monkeypatch, tmp_path):
 
 def test_unexpected_matcher_failure_does_not_expose_details(monkeypatch, tmp_path):
     monkeypatch.setattr(web_app, "load_config", lambda: config())
-    monkeypatch.setattr(web_app.matcher, "match_audio", lambda *args: (_ for _ in ()).throw(RuntimeError("secret C:\\private\\token")))
+    monkeypatch.setattr(
+        web_app.matcher,
+        "match_audio",
+        lambda *args: (_ for _ in ()).throw(RuntimeError("secret C:\\private\\token")),
+    )
     response = web_app.app.test_client().post(
         "/api/match", data=_upload(tmp_path), content_type="multipart/form-data"
     )
     body = response.get_json()
     assert response.status_code == 500
-    assert body == {"status": "error", "error_code": "internal_error", "error": "Recognition failed."}
+    assert body == {
+        "status": "error",
+        "error_code": "internal_error",
+        "error": "Recognition failed.",
+    }
     assert "secret" not in response.get_data(as_text=True)

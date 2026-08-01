@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from dataclasses import asdict, dataclass
 import hashlib
 import json
+from collections import Counter, defaultdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -11,7 +11,6 @@ import numpy as np
 from scipy.ndimage import maximum_filter
 
 from .recorder import AudioClip, load_audio_file
-
 
 INDEX_VERSION = 1
 
@@ -84,7 +83,9 @@ def extract_peaks(
     window = np.hanning(config.frame_size).astype(np.float32)
     spectrum = np.abs(np.fft.rfft(frames * window, axis=1))
     frequencies = np.fft.rfftfreq(config.frame_size, d=1.0 / sample_rate)
-    frequency_mask = (frequencies >= config.min_frequency_hz) & (frequencies <= config.max_frequency_hz)
+    frequency_mask = (frequencies >= config.min_frequency_hz) & (
+        frequencies <= config.max_frequency_hz
+    )
     if not np.any(frequency_mask):
         return []
 
@@ -133,7 +134,10 @@ def generate_hashes(
             targets.append((delta_frames, target))
             if len(targets) >= config.fanout:
                 break
-        hashes.extend((_hash_pair(anchor, target, delta_frames), anchor.time_frame) for delta_frames, target in targets)
+        hashes.extend(
+            (_hash_pair(anchor, target, delta_frames), anchor.time_frame)
+            for delta_frames, target in targets
+        )
     return hashes
 
 

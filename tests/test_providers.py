@@ -1,6 +1,6 @@
+import json
 import subprocess
 import unittest
-import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -180,7 +180,9 @@ class ProviderAdapterTests(unittest.TestCase):
 
     @patch("shazam_project.matcher._write_clip_to_wav")
     @patch("shazam_project.matcher.shutil.which", return_value="fpcalc")
-    @patch("shazam_project.matcher.subprocess.run", side_effect=subprocess.TimeoutExpired("fpcalc", 1))
+    @patch(
+        "shazam_project.matcher.subprocess.run", side_effect=subprocess.TimeoutExpired("fpcalc", 1)
+    )
     def test_acoustid_timeout_removes_temp_file(self, run, which, write):
         result = matcher.match_audio_acoustid(_clip(), AppConfig("", acoustid_api_key="KEY"))
         self._assert_error(result, "timeout", "AcoustID fingerprinting timed out")
@@ -220,7 +222,10 @@ class ProviderAdapterTests(unittest.TestCase):
         result = matcher.match_audio_acoustid(_clip(), AppConfig("", acoustid_api_key="KEY"))
         self._assert_error(result, "malformed_response", "AcoustID returned invalid JSON")
 
-    @patch("shazam_project.matcher.requests.post", side_effect=RuntimeError(r"C:\private\temp\provider internals"))
+    @patch(
+        "shazam_project.matcher.requests.post",
+        side_effect=RuntimeError(r"C:\private\temp\provider internals"),
+    )
     def test_provider_exception_diagnostics_are_not_public(self, post):
         result = matcher.match_audio_shazam(_clip(), AppConfig("", rapidapi_key="KEY"))
         public = json.dumps(result)
@@ -231,7 +236,9 @@ class ProviderAdapterTests(unittest.TestCase):
     @patch("shazam_project.matcher.shutil.which", return_value="fpcalc")
     @patch("shazam_project.matcher.subprocess.run")
     def test_fpcalc_stderr_is_not_public(self, run, which):
-        run.return_value = MagicMock(returncode=1, stdout="", stderr=r"C:\temp\fpcalc secret stderr")
+        run.return_value = MagicMock(
+            returncode=1, stdout="", stderr=r"C:\temp\fpcalc secret stderr"
+        )
         result = matcher.match_audio_acoustid(_clip(), AppConfig("", acoustid_api_key="KEY"))
         public = json.dumps(result)
         self.assertEqual(result["error_code"], "fpcalc_error")

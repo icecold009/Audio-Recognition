@@ -14,8 +14,11 @@ import sys
 import tempfile
 import threading
 import time
-from flask_cors import CORS
+from datetime import datetime, timezone
+from pathlib import Path
+
 from dotenv import load_dotenv
+from flask_cors import CORS
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -27,14 +30,11 @@ from shazam_project import matcher
 from shazam_project.config import AppConfig, load_config
 from shazam_project.recorder import AudioInputError, convert_with_ffmpeg, load_audio_file
 
-
 load_dotenv()
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
 CORS_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv("CORS_ORIGINS", "").split(",")
-    if origin.strip()
+    origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()
 ]
 CORS(app, origins=CORS_ORIGINS)
 app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
@@ -365,7 +365,9 @@ def _load_web_upload(upload, config: AppConfig):
 
 def _audio_error_response(exc: AudioInputError):
     status_code = 413 if exc.code in {"upload_too_large", "too_long"} else 400
-    return jsonify({"status": "invalid_audio", "error_code": exc.code, "error": exc.message}), status_code
+    return jsonify(
+        {"status": "invalid_audio", "error_code": exc.code, "error": exc.message}
+    ), status_code
 
 
 def _quota_unavailable_response():
@@ -399,7 +401,13 @@ def api_match():
     if _quota_mode() == "unavailable":
         return _quota_unavailable_response()
     if "file" not in request.files:
-        return jsonify({"status": "invalid_audio", "error_code": "missing_upload", "error": "No audio file was uploaded."}), 400
+        return jsonify(
+            {
+                "status": "invalid_audio",
+                "error_code": "missing_upload",
+                "error": "No audio file was uploaded.",
+            }
+        ), 400
 
     client_id_hash = _client_id_hash()
     limit_check = _check_rate_limits(client_id_hash)
@@ -414,7 +422,13 @@ def api_match():
     except AudioInputError as exc:
         return _audio_error_response(exc)
     except Exception:
-        return jsonify({"status": "error", "error_code": "upload_failed", "error": "Audio upload could not be processed."}), 400
+        return jsonify(
+            {
+                "status": "error",
+                "error_code": "upload_failed",
+                "error": "Audio upload could not be processed.",
+            }
+        ), 400
 
     quota_result = _consume_quota(client_id_hash)
     if quota_result.get("service_error"):
@@ -424,7 +438,9 @@ def api_match():
     try:
         return jsonify(matcher.match_audio(clip, config))
     except Exception:
-        return jsonify({"status": "error", "error_code": "internal_error", "error": "Recognition failed."}), 500
+        return jsonify(
+            {"status": "error", "error_code": "internal_error", "error": "Recognition failed."}
+        ), 500
 
 
 @app.errorhandler(413)

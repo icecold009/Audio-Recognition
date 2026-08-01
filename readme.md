@@ -102,11 +102,16 @@ Run the Python tests and coverage locally:
 ```powershell
 python -m pytest -q
 python -m coverage run --branch --source=shazam_project,web,scripts -m pytest -q
-python -m coverage report --fail-under=50 --show-missing
+python -m coverage report --fail-under=70 --show-missing
+ruff format --check .
+ruff check .
+pip-audit -r requirements.txt -r requirements-dev.txt --progress-spinner off
 ```
-`tests/` covers FFT image creation, mocked provider flows, dispatcher fallback, web routes, and synthetic local fingerprint index matching.
+`tests/` covers configuration loading and backend combinations, mocked microphone failures and cleanup, normalized audio, mocked provider flows and fallback, Flask routes, safe incomplete metadata rendering contracts, rate limits, FFmpeg failures, Supabase failures, and a generated WAV end-to-end test. The generated WAV is created in memory and contains no third-party recording.
 
-GitHub Actions runs pytest on every push and pull request across Python 3.10, 3.11, and 3.12. A Python 3.12 coverage job enforces at least 50% total branch coverage across the Python packages and benchmark scripts and publishes `coverage.xml` as an artifact. Codecov integration is deferred to the later CI-hardening task because the current upload reports `Repository not found`; the README does not claim a successful Codecov upload.
+GitHub Actions runs pytest on every push and pull request across Python 3.10, 3.11, and 3.12, Ruff formatting and lint, a Python 3.12 branch-coverage gate at 70%, `pip-audit`, and Gitleaks secret scanning. The coverage job publishes `coverage.xml` as an artifact. Provider network calls, Supabase credentials, `fpcalc`, FFmpeg, and microphone hardware are mocked or tested through stable failure paths in CI; they are excluded from the release gate because they require external credentials or host devices.
+
+Direct Python dependencies use reviewed major-compatible ranges in `requirements.txt` and `requirements-dev.txt`. To update one, review its release notes and Python 3.10–3.12 compatibility, edit its range, install from both requirement files, then run the full pytest, coverage, Ruff, compile, diff, and `pip-audit` checks. Do not add credentials or resolve updates from a developer's private environment.
 
 For the real-world comparison, see [`evaluation/README.md`](evaluation/README.md). It records speaker-to-microphone clips at 4, 8, and 15 seconds, builds the local landmark-hash index from clean source tracks, and compares the local backend against all three provider backends.
 
