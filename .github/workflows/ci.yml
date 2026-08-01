@@ -132,3 +132,50 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  container-smoke:
+    name: Container build and smoke test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build production image
+        run: docker build --tag audio-recognition-ci .
+
+      - name: Run non-root container and smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id="$(docker run --detach --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --publish 127.0.0.1:5000:5000 \
+            --env APP_ENV=development \
+            --env PORT=5000 \
+            audio-recognition-ci)"
+          trap 'docker logs "$container_id"; docker rm --force "$container_id"' EXIT
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5000/healthz; then
+              break
+            fi
+            if [ "$attempt" = "30" ]; then
+              echo "Container did not become healthy" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+          test "$(docker inspect --format '{{.Config.User}}' "$container_id")" = "10001:10001"
+          docker exec "$container_id" sh -c 'command -v ffmpeg && command -v fpcalc && gunicorn --version'
+          curl --fail --silent http://127.0.0.1:5000/
+          curl --fail --silent http://127.0.0.1:5000/healthz
+          test "$(curl --silent --output /tmp/ready.json --write-out '%{http_code}' http://127.0.0.1:5000/readyz)" = "503"
+          curl --fail --silent http://127.0.0.1:5000/api/status
+          printf 'not a wav file' > /tmp/invalid.wav
+          test "$(curl --silent --output /tmp/invalid.json --write-out '%{http_code}' \
+            -F 'file=@/tmp/invalid.wav;filename=invalid.wav' \
+            http://127.0.0.1:5000/api/match)" = "400"
+          grep -q 'invalid_audio' /tmp/invalid.json

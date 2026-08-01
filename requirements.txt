@@ -7,6 +7,7 @@ requests>=2.31,<3
 Pillow>=12.3,<13
 Flask>=3,<4
 Werkzeug>=3,<4
+gunicorn>=23,<24
 python-dotenv>=1,<2
 flask-cors>=4,<7
 supabase>=2,<3

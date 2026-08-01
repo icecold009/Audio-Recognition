@@ -50,25 +50,82 @@ flowchart LR
 Theme: black / white / blue — white nodes with a professional DodgerBlue accent (#1E90FF). The browser UI is served directly by Flask; there is no separate browser bundle.
 
 ## Quickstart
-1) Create & activate a venv:
+### Windows PowerShell
+
+1) Create and activate a venv:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
-2) Install runtime deps:
+2) Install runtime dependencies and copy configuration:
 ```powershell
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
-3) Add configuration:
+3) Add provider values to `.env` if recognition is needed. Verify host tools when using
+non-WAV uploads or AcoustID:
 ```powershell
-copy .env.example .env
-# edit .env to add AUDD_API_TOKEN or other keys
+ffmpeg -version
+fpcalc -version
 ```
-4) Run CLI when terminal recognition is needed:
+4) Run the Flask development server:
+```powershell
+python web/app.py
+# open http://127.0.0.1:5000
+```
+5) Run CLI when terminal recognition is needed:
 ```powershell
 python main.py
 ```
-5) Run the complete browser UI and API from Flask:
+
+### macOS/Linux
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
+python web/app.py
+```
+
+Install host tools outside Docker when needed: macOS uses `brew install ffmpeg chromaprint`;
+Debian/Ubuntu uses `sudo apt-get install ffmpeg libchromaprint-tools`. These commands are
+only for local host setup; the production image installs the same runtime tools itself.
+
+Run the CLI with `python main.py`. On macOS/Linux, a production-style local WSGI process is:
+
+```bash
+APP_ENV=production PORT=8000 gunicorn --config gunicorn.conf.py web.app:app
+```
+
+Production mode requires the server-only Supabase quota configuration and at least one
+recognition backend. It fails closed with HTTP 503 when those requirements are unavailable.
+
+### Docker
+
+The reproducible production image installs Python, Gunicorn, FFmpeg, Chromaprint/fpcalc,
+audio libraries, and curl for health checks. It runs as UID/GID `10001`, uses Gunicorn, and
+reads the platform-provided `PORT`.
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+The compose service uses Gunicorn with a read-only root filesystem and a bounded 64 MiB
+`/tmp` tmpfs. Its default `APP_ENV=development` keeps the local quickstart usable without
+Supabase; configure `.env` and set `APP_ENV=production` when testing the fail-closed
+production path. A direct production start is:
+
+```powershell
+docker build -t audio-recognition .
+docker run --rm -p 5000:5000 --env-file .env audio-recognition
+```
+
+The same commands work from macOS/Linux after replacing `Copy-Item` with `cp`.
+
+The canonical Flask development command remains:
+
 ```powershell
 python web/app.py
 # open http://127.0.0.1:5000
@@ -96,6 +153,20 @@ Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`
 `python web/app.py` serves `/`, `/static/*`, `/api/match`, and `/api/status` from the same origin. CLI file mode accepts WAV/PCM files. Web uploads support WAV, MP3, M4A, AAC, OGG, FLAC, and WEBM; non-WAV web uploads require FFmpeg on `PATH` and are converted before decoding. The browser also supports microphone recording, manual stop, waveform visualization, loading/error/no-match states, light/dark theme persistence, and session-only recognition history.
 
 Every input is downmixed to mono float32 samples in `[-1, 1]` and resampled to 44,100 Hz by default. Provider adapters receive temporary mono 16-bit PCM WAV files. Inputs shorter than 1 second, longer than 30 seconds, or larger than 10 MiB are rejected by default; all three limits are configurable.
+
+The deployment endpoints are:
+
+- `/healthz` is a dependency-free process liveness check and returns HTTP 200 when Flask is serving.
+- `/readyz` checks production configuration, writable temporary storage, FFmpeg, fpcalc when
+  AcoustID is enabled, Supabase quota availability, and at least one recognition backend. It
+  returns HTTP 503 with stable check names when not ready; it never returns secrets, paths,
+  exception text, or database details.
+- `/api/status` reports non-secret backend/tool flags, quota mode, limits, and audio settings.
+
+Gunicorn defaults to two workers, a 45-second request timeout, a 15-second graceful shutdown
+window, and a five-second keep-alive. Provider requests and FFmpeg conversion remain bounded
+by their existing 15-second timeouts. `MAX_UPLOAD_BYTES`, duration limits, Flask's request
+limit, and temporary-file cleanup bound upload and conversion resource use.
 
 ## Testing
 Run the Python tests and coverage locally:
@@ -192,6 +263,8 @@ This image is diagnostic output from `shazam_project.fft_analyze.analyze_audio`;
 |----------------|--------|-------------------------------------------------------|
 | `/api/match`   | POST   | Upload an audio file for recognition. Returns JSON.  |
 | `/api/status`  | GET    | Reports configured backends, ffmpeg, fpcalc status.  |
+| `/healthz`     | GET    | Dependency-free process liveness check.             |
+| `/readyz`      | GET    | Configuration and dependency readiness check.      |
 
 **Example — cURL:**
 ```bash
