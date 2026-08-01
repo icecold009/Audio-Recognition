@@ -270,4 +270,5 @@ avatars/
 | Variable | Used in | Purpose |
 |----------|---------|---------|
 | `SUPABASE_URL` | Flask server | Supabase project URL for optional usage counters |
-| `SUPABASE_KEY` | Flask server | Server-side key for optional usage counters |
+| `SUPABASE_SERVICE_ROLE_KEY` | Flask server | Server-only service-role key for atomic quota RPC calls; never expose to clients |
+| `CLIENT_ID_HMAC_SECRET` | Flask server | Separate server secret used to derive non-reversible quota client identifiers |

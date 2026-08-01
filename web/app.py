@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
+import logging
 from pathlib import Path
+import secrets
 import shutil
 import sys
 import tempfile
+import threading
 import time
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -36,111 +42,233 @@ SUPPORTED_WEB_FORMATS = ("wav", "mp3", "m4a", "aac", "ogg", "flac", "webm")
 SUPPORTED_WEB_SUFFIXES = {f".{extension}" for extension in SUPPORTED_WEB_FORMATS}
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
-supabase: Client | None = None
-if SUPABASE_URL and SUPABASE_KEY:
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+CLIENT_ID_HMAC_SECRET = os.getenv("CLIENT_ID_HMAC_SECRET", "")
+APP_ENV = os.getenv("APP_ENV", "production").strip().lower()
+
+
+def _int_env(name: str, default: int) -> int:
     try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        return int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+TRUSTED_PROXY_COUNT = max(0, _int_env("TRUSTED_PROXY_COUNT", 0))
+TRUSTED_PROXY_IPS = {
+    item.strip()
+    for item in os.getenv("TRUSTED_PROXY_IPS", "").split(",")
+    if item.strip()
+}
+MEMORY_LIMITER_MAX_ENTRIES = max(1, _int_env("MEMORY_LIMITER_MAX_ENTRIES", 10000))
+MEMORY_LIMITER_TTL_SECONDS = max(60, _int_env("MEMORY_LIMITER_TTL_SECONDS", 86400))
+_DEVELOPMENT_HMAC_SECRET = secrets.token_bytes(32)
+
+supabase: Client | None = None
+if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     except Exception:
+        logging.exception("Supabase client initialization failed")
         supabase = None
 
-DAILY_LIMIT = int(os.getenv("DAILY_LIMIT", "15"))
-MONTHLY_LIMIT = int(os.getenv("MONTHLY_LIMIT", "475"))
+DAILY_LIMIT = max(1, _int_env("DAILY_LIMIT", 15))
+MONTHLY_LIMIT = max(1, _int_env("MONTHLY_LIMIT", 475))
 INTERNAL_API_SECRET = os.getenv("INTERNAL_API_SECRET", "")
-COOLDOWN_SECONDS = 30
-last_request_by_ip: dict[str, float] = {}
+COOLDOWN_SECONDS = max(0, _int_env("COOLDOWN_SECONDS", 30))
+
+
+@dataclass
+class MemoryQuotaRecord:
+    daily_period: str
+    daily_count: int
+    monthly_period: str
+    monthly_count: int
+    last_request_at: float | None
+    touched_at: float
+
+
+memory_quota_by_client: dict[str, MemoryQuotaRecord] = {}
+memory_quota_lock = threading.Lock()
 
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _today_key() -> str:
-    return "daily:" + _utc_now().strftime("%Y-%m-%d")
+def _period_keys(now: float) -> tuple[str, str]:
+    current = datetime.fromtimestamp(now, timezone.utc)
+    return current.strftime("%Y-%m-%d"), current.strftime("%Y-%m")
 
 
-def _month_key() -> str:
-    return "monthly:" + _utc_now().strftime("%Y-%m")
+def _seconds_until_next_day(now: float) -> int:
+    current = datetime.fromtimestamp(now, timezone.utc)
+    next_day = (current + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(1, int((next_day - current).total_seconds() + 0.999999))
 
 
-def _get_count(key: str) -> int:
-    if supabase is None:
-        return 0
-    try:
-        response = supabase.table("api_usage").select("call_count").eq("key", key).execute()
-        if response.data and isinstance(response.data[0], dict):
-            return int(response.data[0].get("call_count", 0))
-    except Exception:
-        pass
-    return 0
+def _seconds_until_next_month(now: float) -> int:
+    current = datetime.fromtimestamp(now, timezone.utc)
+    if current.month == 12:
+        next_month = datetime(current.year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        next_month = datetime(current.year, current.month + 1, 1, tzinfo=timezone.utc)
+    return max(1, int((next_month - current).total_seconds() + 0.999999))
 
 
-def _increment_count(key: str) -> None:
-    if supabase is None:
-        return
-    try:
-        supabase.rpc("increment_api_usage", {"p_key": key}).execute()
-    except Exception:
-        pass
+def _rate_limited_decision(error_code: str, error: str, retry_after: int) -> dict:
+    return {
+        "blocked": True,
+        "status_code": 429,
+        "payload": {
+            "status": "rate_limited",
+            "error_code": error_code,
+            "error": error,
+            "retry_after_seconds": max(1, int(retry_after)),
+        },
+    }
 
 
-TRUSTED_PROXIES = {"127.0.0.1", "::1"}
+def _purge_memory_quota(now: float) -> None:
+    cutoff = now - MEMORY_LIMITER_TTL_SECONDS
+    expired = [
+        key for key, record in memory_quota_by_client.items()
+        if record.touched_at < cutoff
+    ]
+    for key in expired:
+        memory_quota_by_client.pop(key, None)
+    if len(memory_quota_by_client) > MEMORY_LIMITER_MAX_ENTRIES:
+        oldest = sorted(
+            memory_quota_by_client,
+            key=lambda key: memory_quota_by_client[key].touched_at,
+        )[: len(memory_quota_by_client) - MEMORY_LIMITER_MAX_ENTRIES]
+        for key in oldest:
+            memory_quota_by_client.pop(key, None)
+
+
+def _memory_quota_decision(client_id_hash: str, *, consume: bool) -> dict:
+    now = time.time()
+    today, month = _period_keys(now)
+    with memory_quota_lock:
+        _purge_memory_quota(now)
+        record = memory_quota_by_client.get(client_id_hash)
+        if record is None:
+            daily_count = 0
+            monthly_count = 0
+            last_request_at = None
+        else:
+            daily_count = record.daily_count if record.daily_period == today else 0
+            monthly_count = record.monthly_count if record.monthly_period == month else 0
+            last_request_at = record.last_request_at
+
+        if last_request_at is not None and now - last_request_at < COOLDOWN_SECONDS:
+            return _rate_limited_decision(
+                "cooldown",
+                "Please wait before trying again.",
+                COOLDOWN_SECONDS - (now - last_request_at),
+            )
+        if daily_count >= DAILY_LIMIT:
+            return _rate_limited_decision(
+                "daily_limit",
+                "Daily recognition limit reached.",
+                _seconds_until_next_day(now),
+            )
+        if monthly_count >= MONTHLY_LIMIT:
+            return _rate_limited_decision(
+                "monthly_limit",
+                "Monthly recognition limit reached.",
+                _seconds_until_next_month(now),
+            )
+        if consume:
+            memory_quota_by_client[client_id_hash] = MemoryQuotaRecord(
+                daily_period=today,
+                daily_count=daily_count + 1,
+                monthly_period=month,
+                monthly_count=monthly_count + 1,
+                last_request_at=now,
+                touched_at=now,
+            )
+        return {"blocked": False}
+
+
+def _production_quota_configured() -> bool:
+    return bool(
+        SUPABASE_URL
+        and SUPABASE_SERVICE_ROLE_KEY
+        and CLIENT_ID_HMAC_SECRET
+        and supabase is not None
+    )
+
+
+def _quota_mode() -> str:
+    if APP_ENV == "development":
+        return "development-memory"
+    if _production_quota_configured():
+        return "production"
+    return "unavailable"
 
 
 def _get_client_ip() -> str:
-    if request.remote_addr in TRUSTED_PROXIES:
-        forwarded = request.headers.get("X-Forwarded-For", "")
-        if forwarded:
-            return forwarded.split(",", 1)[0].strip()
-    return request.remote_addr or "unknown"
+    remote_addr = request.remote_addr or "unknown"
+    if TRUSTED_PROXY_COUNT <= 0 or remote_addr not in TRUSTED_PROXY_IPS:
+        return remote_addr
+    forwarded = [part.strip() for part in request.headers.get("X-Forwarded-For", "").split(",") if part.strip()]
+    if len(forwarded) < TRUSTED_PROXY_COUNT:
+        return remote_addr
+    return forwarded[-TRUSTED_PROXY_COUNT]
 
 
-def _is_same_origin_request() -> bool:
-    origin = request.headers.get("Origin")
-    if origin:
-        normalized = origin.rstrip("/")
-        return normalized == request.host_url.rstrip("/") or normalized in {
-            allowed.rstrip("/") for allowed in CORS_ORIGINS
-        }
-    referrer = request.referrer
-    return bool(referrer and referrer.startswith(request.host_url))
+def _client_id_hash() -> str:
+    secret = CLIENT_ID_HMAC_SECRET.encode("utf-8") if CLIENT_ID_HMAC_SECRET else _DEVELOPMENT_HMAC_SECRET
+    return hmac.new(secret, _get_client_ip().encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def _check_rate_limits(ip: str) -> dict:
-    now = time.time()
-    last_seen = last_request_by_ip.get(ip)
-    if last_seen is not None and COOLDOWN_SECONDS - (now - last_seen) > 0:
-        return {
-            "blocked": True,
-            "status_code": 429,
-            "payload": {
-                "status": "rate_limited",
-                "error_code": "cooldown",
-                "error": "Please wait before trying again.",
+def _check_rate_limits(client_id_hash: str) -> dict:
+    """Perform a non-consuming development preflight check.
+
+    Production quota decisions happen only in the atomic RPC after valid audio
+    has been decoded, so invalid uploads never consume database quota.
+    """
+    if APP_ENV == "development":
+        return _memory_quota_decision(client_id_hash, consume=False)
+    return {"blocked": False}
+
+
+def _consume_quota(client_id_hash: str) -> dict:
+    if APP_ENV == "development":
+        return _memory_quota_decision(client_id_hash, consume=True)
+    if not _production_quota_configured():
+        return {"service_error": True}
+    try:
+        response = supabase.rpc(
+            "consume_api_quota",
+            {
+                "p_client_id_hash": client_id_hash,
+                "p_daily_limit": DAILY_LIMIT,
+                "p_monthly_limit": MONTHLY_LIMIT,
+                "p_cooldown_seconds": COOLDOWN_SECONDS,
+                "p_now": _utc_now().isoformat(),
             },
-        }
-
-    today = _today_key()
-    month = _month_key()
-    if _get_count(today) >= DAILY_LIMIT:
-        return {
-            "blocked": True,
-            "status_code": 429,
-            "payload": {"status": "rate_limited", "error_code": "daily_limit", "error": "Daily recognition limit reached."},
-        }
-    if _get_count(month) >= MONTHLY_LIMIT:
-        return {
-            "blocked": True,
-            "status_code": 429,
-            "payload": {"status": "rate_limited", "error_code": "monthly_limit", "error": "Monthly recognition limit reached."},
-        }
-    return {"blocked": False, "today": today, "month": month, "now": now}
-
-
-def _record_request(ip: str, today: str, month: str, now: float) -> None:
-    last_request_by_ip[ip] = now
-    _increment_count(today)
-    _increment_count(month)
+        ).execute()
+        data = response.data
+        if isinstance(data, list):
+            data = data[0] if data else None
+        if not isinstance(data, dict) or "allowed" not in data:
+            raise RuntimeError("quota RPC returned an invalid response")
+        if data["allowed"]:
+            return {"blocked": False}
+        reason = str(data.get("reason", "quota_limit"))
+        if reason == "cooldown":
+            error = "Please wait before trying again."
+        elif reason == "daily_limit":
+            error = "Daily recognition limit reached."
+        else:
+            reason = "monthly_limit" if reason == "monthly_limit" else "quota_limit"
+            error = "Monthly recognition limit reached." if reason == "monthly_limit" else "Recognition quota reached."
+        return _rate_limited_decision(reason, error, int(data.get("retry_after_seconds", 1)))
+    except Exception:
+        logging.exception("Supabase quota RPC failed")
+        return {"service_error": True}
 
 
 def _file_size(upload) -> int | None:
@@ -204,6 +332,25 @@ def _audio_error_response(exc: AudioInputError):
     return jsonify({"status": "invalid_audio", "error_code": exc.code, "error": exc.message}), status_code
 
 
+def _quota_unavailable_response():
+    return jsonify(
+        {
+            "status": "error",
+            "error_code": "quota_unavailable",
+            "error": "Production quota service is unavailable.",
+        }
+    ), 503
+
+
+def _rate_limit_response(decision: dict):
+    payload = decision["payload"]
+    retry_after = max(1, int(payload.get("retry_after_seconds", 1)))
+    payload.setdefault("retry_after_seconds", retry_after)
+    return jsonify(payload), decision["status_code"], {
+        "Retry-After": str(retry_after),
+    }
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -211,19 +358,17 @@ def index():
 
 @app.route("/api/match", methods=["POST"])
 def api_match():
-    if (
-        INTERNAL_API_SECRET
-        and request.headers.get("X-API-Secret") != INTERNAL_API_SECRET
-        and not _is_same_origin_request()
-    ):
+    if INTERNAL_API_SECRET and request.headers.get("X-API-Secret") != INTERNAL_API_SECRET:
         return jsonify({"status": "error", "error_code": "unauthorized", "error": "Unauthorized."}), 401
+    if _quota_mode() == "unavailable":
+        return _quota_unavailable_response()
     if "file" not in request.files:
         return jsonify({"status": "invalid_audio", "error_code": "missing_upload", "error": "No audio file was uploaded."}), 400
 
-    client_ip = _get_client_ip()
-    limit_check = _check_rate_limits(client_ip)
+    client_id_hash = _client_id_hash()
+    limit_check = _check_rate_limits(client_id_hash)
     if limit_check["blocked"]:
-        return jsonify(limit_check["payload"]), limit_check["status_code"]
+        return _rate_limit_response(limit_check)
 
     config = load_config()
     try:
@@ -233,7 +378,11 @@ def api_match():
     except Exception:
         return jsonify({"status": "error", "error_code": "upload_failed", "error": "Audio upload could not be processed."}), 400
 
-    _record_request(client_ip, limit_check["today"], limit_check["month"], limit_check["now"])
+    quota_result = _consume_quota(client_id_hash)
+    if quota_result.get("service_error"):
+        return _quota_unavailable_response()
+    if quota_result["blocked"]:
+        return _rate_limit_response(quota_result)
     try:
         return jsonify(matcher.match_audio(clip, config))
     except Exception:
@@ -255,29 +404,43 @@ def request_entity_too_large(_error):
 def api_status():
     config = load_config()
     fpcalc_path_exists = bool(config.fpcalc_path and Path(config.fpcalc_path).exists())
-    return jsonify(
-        {
-            "supabase_configured": supabase is not None,
-            "rapidapi_configured": bool(config.rapidapi_key),
-            "acoustid_configured": bool(config.acoustid_api_key),
-            "audd_configured": bool(config.audd_api_token),
-            "local_index_configured": bool(config.fingerprint_index_path),
-            "fpcalc_on_path": bool(shutil.which("fpcalc")),
-            "fpcalc_path_exists": fpcalc_path_exists,
-            "ffmpeg_on_path": bool(shutil.which("ffmpeg")),
-            "supported_formats": list(SUPPORTED_WEB_FORMATS),
-            "internal_sample_rate": config.internal_sample_rate,
-            "min_audio_seconds": config.min_audio_seconds,
-            "max_audio_seconds": config.max_audio_seconds,
-            "max_upload_bytes": config.max_upload_bytes,
-            "daily_used": _get_count(_today_key()),
-            "daily_limit": DAILY_LIMIT,
-            "monthly_used": _get_count(_month_key()),
-            "monthly_limit": MONTHLY_LIMIT,
-            "cooldown_seconds": COOLDOWN_SECONDS,
-        }
-    )
+    quota_mode = _quota_mode()
+    body = {
+        "status": "ok" if quota_mode != "unavailable" else "error",
+        "supabase_configured": _production_quota_configured(),
+        "quota_mode": quota_mode,
+        "production_grade_quotas_enabled": quota_mode == "production",
+        "rapidapi_configured": bool(config.rapidapi_key),
+        "acoustid_configured": bool(config.acoustid_api_key),
+        "audd_configured": bool(config.audd_api_token),
+        "local_index_configured": bool(config.fingerprint_index_path),
+        "fpcalc_on_path": bool(shutil.which("fpcalc")),
+        "fpcalc_path_exists": fpcalc_path_exists,
+        "ffmpeg_on_path": bool(shutil.which("ffmpeg")),
+        "supported_formats": list(SUPPORTED_WEB_FORMATS),
+        "internal_sample_rate": config.internal_sample_rate,
+        "min_audio_seconds": config.min_audio_seconds,
+        "max_audio_seconds": config.max_audio_seconds,
+        "max_upload_bytes": config.max_upload_bytes,
+        "daily_limit": DAILY_LIMIT,
+        "monthly_limit": MONTHLY_LIMIT,
+        "cooldown_seconds": COOLDOWN_SECONDS,
+        "trusted_proxy_count": TRUSTED_PROXY_COUNT,
+    }
+    if quota_mode == "unavailable":
+        body.update(
+            {
+                "error_code": "quota_unavailable",
+                "error": "Production quota service is unavailable.",
+            }
+        )
+        return jsonify(body), 503
+    return jsonify(body)
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=os.getenv("FLASK_DEBUG", "0") == "1")
+    app.run(
+        host="127.0.0.1",
+        port=5000,
+        debug=APP_ENV == "development" and os.getenv("FLASK_DEBUG", "0") == "1",
+    )

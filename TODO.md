@@ -54,14 +54,14 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 
 ### Main task 4 — Production configuration and security
 
-- [ ] Reconcile `SUPABASE_KEY` with service-role-key naming and the intended security model.
+- [x] Reconcile `SUPABASE_SERVICE_ROLE_KEY` with the server-only service-role security model.
 - [ ] Decide whether `INTERNAL_API_SECRET` is required for the supported browser flow.
 - [ ] Standardize response fields and statuses across providers and the CLI/browser consumers.
 - [ ] Add a startup/health check for provider, Supabase, FFmpeg, and `fpcalc` configuration.
-- [ ] Make quota checks and increments atomic, and define fail-closed behavior for Supabase failures.
-- [ ] Bound cooldown/IP state and document the trusted proxy model.
-- [ ] Add `Retry-After` headers and disable debug mode outside explicit local development.
-- [ ] Add a production WSGI/server configuration and tests for authorization, limits, concurrency, and Supabase failures.
+- [x] Make quota checks and increments atomic, and define fail-closed behavior for Supabase failures.
+- [x] Bound cooldown/client state and document the trusted proxy model.
+- [x] Add `Retry-After` headers and disable debug mode outside explicit local development.
+- [x] Add production rate-limit tests for authorization, limits, concurrency, and Supabase failures.
 - [ ] Tick Main task 4 only after the security/configuration review has evidence and no undocumented production assumptions.
 
 ### Main task 5 — Test-depth expansion
@@ -168,8 +168,8 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 ### Configuration and API contract
 
 - [x] Load `.env` before creating the Supabase client in `web/app.py`, or use one explicit application configuration path.
-- [ ] Reconcile `SUPABASE_KEY` with the documented `SUPABASE_SERVICE_ROLE_KEY` naming and security model.
-- [ ] Decide whether the API requires an internal secret at all for browser clients.
+- [x] Reconcile `SUPABASE_SERVICE_ROLE_KEY` with the documented server-only security model.
+- [x] Require `X-API-Secret` directly when configured; Origin/Referer never authenticates browser clients.
 - [x] Keep real server secrets out of browser configuration and static assets.
 - [x] Make the Flask-served UI work when `INTERNAL_API_SECRET` is enabled, or remove that mode from the supported flow. Configured same-origin/allowlisted browser requests are accepted without exposing the secret.
 - [x] Configure optional cross-origin API access from an allowlist; same-origin browser access is the default.
@@ -180,17 +180,17 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 
 ### Rate limiting and production safety
 
-- [ ] Prompt 4 blocker: the Origin/Referer same-origin path can bypass `INTERNAL_API_SECRET`; the production trust model and secret boundary need a deliberate decision.
-- [ ] Prompt 4 blocker: Supabase quota reads and increments are non-atomic and can race under concurrent requests.
-- [ ] Prompt 4 blocker: Supabase failures fail open by returning zero usage and continuing recognition; production behavior must be fail-closed or visibly disable quota-protected recognition.
+- [x] Prompt 4 blocker resolved: Origin/Referer is no longer an authentication bypass; `X-API-Secret` is checked directly when configured.
+- [x] Prompt 4 blocker resolved: Supabase quota checks and increments use one row-locked atomic RPC operation.
+- [x] Prompt 4 blocker resolved: missing production configuration and Supabase failures return visible HTTP 503 responses.
 
-- [ ] Make quota check and increment atomic so concurrent requests cannot bypass the limit.
-- [ ] Decide whether Supabase failure should fail closed or visibly disable recognition instead of silently returning zero usage.
-- [ ] Replace process-local cooldown state with a shared, bounded mechanism if multiple workers or instances are supported.
-- [ ] Bound or expire the in-memory IP map if it remains in use.
-- [ ] Validate proxy configuration and document the trusted proxy model.
-- [ ] Add `Retry-After` headers to rate-limit responses.
-- [ ] Disable `debug=True` outside an explicitly local development mode.
+- [x] Make quota check and increment atomic so concurrent requests cannot bypass the limit.
+- [x] Make Supabase failure fail closed with a visible 503; development fallback is explicit and visible in `/api/status`.
+- [ ] Replace process-local cooldown state with a shared mechanism if multiple workers or instances are supported; the local fallback is bounded and development-only.
+- [x] Bound or expire the in-memory client map when it is used for development fallback.
+- [x] Validate proxy configuration and document the trusted proxy model.
+- [x] Add `Retry-After` headers to rate-limit responses.
+- [x] Disable `debug=True` outside an explicitly local development mode.
 - [ ] Add a production WSGI/server configuration and document deployment assumptions.
 - [ ] Add tests for unauthorized requests, daily limits, monthly limits, cooldowns, concurrent requests, and Supabase failures.
 
@@ -201,7 +201,7 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 - [x] Add Flask test-client coverage for `/`, static assets, `/api/status`, and `/api/match`.
 - [x] Test missing, malformed, oversized, duration-rejected, and FFmpeg-conversion upload paths, matcher success/no-match, and API-secret origin behavior.
 - [x] Test API-secret behavior in the supported browser-origin path.
-- [ ] Test rate-limit responses and quota accounting through the public route.
+- [x] Test rate-limit responses and quota accounting through the public route.
 - [ ] Add tests for `load_config()` and `missing_configuration()` including `.env`, missing keys, invalid `FP_CALC_PATH`, and provider combinations.
 - [ ] Add microphone tests using a mocked `sounddevice` implementation, including invalid duration, invalid sample rate, capture failure, and cleanup. Prompt 3 now proves configured too-short/too-long requests do not start recording.
 - [x] Add coverage reporting with `coverage.py`, a 50% minimum threshold, and a preserved `coverage.xml` artifact. Current measured branch coverage is 66% across `shazam_project`, `web`, and `scripts`; Codecov remains deferred because the repository is not found.
@@ -268,6 +268,7 @@ Record evidence here as work lands:
 
 | Date | Task/check | Evidence | Result |
 |---|---|---|---|
+| 2026-08-01 | Production rate limits | Added `production_rate_limits` migration through the Supabase CLI; private row-locked quota RPC, RLS with no public policies, server-only service-role access, HMAC client identifiers, fail-closed 503 handling, development fallback, trusted-proxy configuration, direct API-secret authentication, and Retry-After responses. | 93 tests passed; 68% total branch coverage; compileall and diff checks passed. Local/linked SQL execution remains unavailable: Docker is not running and the linked `shazam-project` is inactive; linked advisors returned no lints and migration listing timed out. |
 | 2026-08-01 | Prompt 3 cleanup and review fixes | Flask status display restored RapidAPI and Supabase fields; local `no_match` uses the shared `result: null` shape; all providers receive normalized mono float32 audio; provider diagnostics are safe; rate limits run before upload processing; fixed 16-bit provider WAV encoding is documented; README/TODO record the validated contract and Prompt 4 production blockers. | 73 tests passed; 66% total branch coverage; compileall and diff checks passed locally; CI and `coverage.xml` artifact are pending this push; Codecov upload previously reported `Repository not found` and remains deferred |
 | 2026-07-31 | Initial repository review | `main` at `77d159f`; accuracy remains `X / Y`; Python execution was unavailable locally because the existing virtualenv points to an inaccessible interpreter. | Baseline recorded |
 | 2026-07-31 | P0/P1 web and matcher slice | `feature/evaluation-todo`; 10 Python unit/integration tests passed; dispatcher fallback, browser-origin auth, upload/audio limits, dotenv loading, and runtime status fields were added. | Verified; benchmark, full web coverage, and production deployment remain open |

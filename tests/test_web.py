@@ -24,7 +24,8 @@ def _wav_bytes(duration_seconds: float = 1.5, sample_rate: int = 8000) -> bytes:
 class WebRouteTests(unittest.TestCase):
     def setUp(self):
         web_app.app.config.update(TESTING=True, MAX_CONTENT_LENGTH=25 * 1024 * 1024)
-        web_app.last_request_by_ip.clear()
+        web_app.APP_ENV = "development"
+        web_app.memory_quota_by_client.clear()
         web_app.supabase = None
         self.client = web_app.app.test_client()
 
@@ -69,7 +70,7 @@ class WebRouteTests(unittest.TestCase):
             response = self.client.post(
                 "/api/match",
                 data={"file": (BytesIO(_wav_bytes()), "sample.wav")},
-                headers={"Origin": "http://localhost"},
+                headers={"Origin": "http://localhost", "X-API-Secret": "server-only-secret"},
             )
 
         self.assertEqual(response.status_code, 200)
@@ -85,7 +86,7 @@ class WebRouteTests(unittest.TestCase):
             response = self.client.post(
                 "/api/match",
                 data={"file": (BytesIO(_wav_bytes()), "sample.wav")},
-                headers={"Origin": "http://localhost"},
+                headers={"Origin": "http://localhost", "X-API-Secret": "server-only-secret"},
             )
 
         self.assertEqual(response.status_code, 200)
@@ -120,7 +121,7 @@ class WebRouteTests(unittest.TestCase):
             response = self.client.post(
                 "/api/match",
                 data={"file": (BytesIO(_wav_bytes()), "sample.wav")},
-                headers={"Origin": "http://localhost"},
+                headers={"Origin": "http://localhost", "X-API-Secret": "server-only-secret"},
             )
 
         self.assertEqual(response.status_code, 413)
