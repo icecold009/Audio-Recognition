@@ -9,8 +9,12 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-import sounddevice as sd
 import soundfile as sf
+
+try:
+    import sounddevice as sd
+except (ImportError, OSError):  # pragma: no cover - depends on host PortAudio
+    sd = None
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -119,6 +123,12 @@ def _record_source(
     manifest_path: Path | None = None,
 ) -> list[dict[str, str]]:
     manifest_path = manifest_path or output_dir / "manifest.csv"
+    global sd
+    if sd is None:
+        try:
+            import sounddevice as sd
+        except (ImportError, OSError) as exc:  # pragma: no cover - host dependency
+            raise RuntimeError("Microphone recording requires PortAudio and sounddevice.") from exc
     if pending_lengths is None:
         pending_lengths = [
             length

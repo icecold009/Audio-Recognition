@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -110,11 +111,13 @@ def test_recording_resume_preserves_verified_clip(monkeypatch, tmp_path):
         lambda _path: (np.zeros(15 * 8000, dtype=np.float32), 8000),
     )
     monkeypatch.setattr(
-        record_benchmark.sd,
-        "playrec",
-        lambda *args, **kwargs: np.zeros(15 * 8000, dtype=np.float32),
+        record_benchmark,
+        "sd",
+        SimpleNamespace(
+            playrec=lambda *args, **kwargs: np.zeros(15 * 8000, dtype=np.float32),
+            stop=lambda: None,
+        ),
     )
-    monkeypatch.setattr(record_benchmark.sd, "stop", lambda: None)
 
     record_benchmark._record_source(
         source,
