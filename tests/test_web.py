@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from io import BytesIO
 import unittest
-from unittest.mock import patch
 import wave
+from io import BytesIO
+from unittest.mock import patch
 
 from shazam_project.config import AppConfig
 from web import app as web_app
@@ -52,8 +52,9 @@ class WebRouteTests(unittest.TestCase):
 
     def test_status_reports_backend_and_runtime_configuration(self):
         cfg = AppConfig(audd_api_token="", acoustid_api_key="", rapidapi_key="RAPID")
-        with patch.object(web_app, "load_config", return_value=cfg), patch.object(
-            web_app.shutil, "which", return_value=None
+        with (
+            patch.object(web_app, "load_config", return_value=cfg),
+            patch.object(web_app.shutil, "which", return_value=None),
         ):
             response = self.client.get("/api/status")
 
@@ -72,9 +73,11 @@ class WebRouteTests(unittest.TestCase):
     def test_match_accepts_authenticated_browser_request_without_exposing_secret(self):
         cfg = AppConfig(audd_api_token="TOKEN")
         result = {"status": "matched", "title": "Test Song", "artist": "Tester"}
-        with patch.object(web_app, "INTERNAL_API_SECRET", "server-only-secret"), patch.object(
-            web_app, "load_config", return_value=cfg
-        ), patch.object(web_app.matcher, "match_audio", return_value=result) as match_mock:
+        with (
+            patch.object(web_app, "INTERNAL_API_SECRET", "server-only-secret"),
+            patch.object(web_app, "load_config", return_value=cfg),
+            patch.object(web_app.matcher, "match_audio", return_value=result) as match_mock,
+        ):
             response = self.client.post(
                 "/api/match",
                 data={"file": (BytesIO(_wav_bytes()), "sample.wav")},
@@ -88,9 +91,11 @@ class WebRouteTests(unittest.TestCase):
     def test_match_returns_no_match_using_the_shared_contract(self):
         cfg = AppConfig(audd_api_token="TOKEN")
         result = {"status": "no_match", "result": None}
-        with patch.object(web_app, "INTERNAL_API_SECRET", "server-only-secret"), patch.object(
-            web_app, "load_config", return_value=cfg
-        ), patch.object(web_app.matcher, "match_audio", return_value=result) as match_mock:
+        with (
+            patch.object(web_app, "INTERNAL_API_SECRET", "server-only-secret"),
+            patch.object(web_app, "load_config", return_value=cfg),
+            patch.object(web_app.matcher, "match_audio", return_value=result) as match_mock,
+        ):
             response = self.client.post(
                 "/api/match",
                 data={"file": (BytesIO(_wav_bytes()), "sample.wav")},
@@ -123,9 +128,10 @@ class WebRouteTests(unittest.TestCase):
 
     def test_match_rejects_audio_over_duration_limit(self):
         cfg = AppConfig(audd_api_token="TOKEN", max_audio_seconds=0)
-        with patch.object(web_app, "load_config", return_value=cfg), patch.object(
-            web_app.matcher, "match_audio"
-        ) as match_mock:
+        with (
+            patch.object(web_app, "load_config", return_value=cfg),
+            patch.object(web_app.matcher, "match_audio") as match_mock,
+        ):
             response = self.client.post(
                 "/api/match",
                 data={"file": (BytesIO(_wav_bytes()), "sample.wav")},

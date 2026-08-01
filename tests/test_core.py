@@ -1,20 +1,20 @@
 import os
-from pathlib import Path
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 
+from shazam_project import matcher
 from shazam_project.config import AppConfig
 from shazam_project.fft_analyze import analyze_audio
-from shazam_project import matcher
 from shazam_project.recorder import AudioClip
 
 
 class CoreTests(unittest.TestCase):
     def test_analyze_audio_creates_file(self):
         sr = 44100
-        t = np.linspace(0, 0.2, int(0.2*sr), endpoint=False)
+        t = np.linspace(0, 0.2, int(0.2 * sr), endpoint=False)
         samples = 0.5 * np.sin(2 * np.pi * 440 * t)
         out = analyze_audio(samples, sr, "tests/test_fft.png")
         self.assertTrue(Path(out).exists())
@@ -55,7 +55,7 @@ class CoreTests(unittest.TestCase):
 
         # create small clip
         sr = 44100
-        t = np.linspace(0, 0.1, int(0.1*sr), endpoint=False)
+        t = np.linspace(0, 0.1, int(0.1 * sr), endpoint=False)
         samples = 0.1 * np.sin(2 * np.pi * 440 * t)
         clip = AudioClip(samples=samples, sample_rate=sr, source="test")
 
@@ -69,7 +69,9 @@ class CoreTests(unittest.TestCase):
             artist_val = ", ".join(str(x) for x in artist_val)
         # coerce None to empty string for clearer assertion
         artist_val = artist_val or ""
-        self.assertIn("Tester", artist_val, msg=f"artist_val did not contain Tester: {artist_val!r}")
+        self.assertIn(
+            "Tester", artist_val, msg=f"artist_val did not contain Tester: {artist_val!r}"
+        )
 
     @patch("shazam_project.matcher.match_audio_acoustid")
     @patch("shazam_project.matcher.match_audio_shazam")
@@ -81,7 +83,9 @@ class CoreTests(unittest.TestCase):
             "artist": "Fallback Artist",
         }
 
-        clip = AudioClip(samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test")
+        clip = AudioClip(
+            samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test"
+        )
         cfg = AppConfig(
             audd_api_token="",
             acoustid_api_key="ACOUSTID",
@@ -106,7 +110,9 @@ class CoreTests(unittest.TestCase):
             "artist": "AudD Artist",
         }
 
-        clip = AudioClip(samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test")
+        clip = AudioClip(
+            samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test"
+        )
         cfg = AppConfig(audd_api_token="AUDD", acoustid_api_key="", rapidapi_key="RAPIDAPI")
 
         result = matcher.match_audio(clip, cfg)
@@ -119,7 +125,9 @@ class CoreTests(unittest.TestCase):
         )
 
     def test_dispatcher_reports_missing_backend(self):
-        clip = AudioClip(samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test")
+        clip = AudioClip(
+            samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test"
+        )
         result = matcher.match_audio(clip, AppConfig(audd_api_token=""))
         self.assertEqual(result["status"], "not_configured")
         self.assertEqual({attempt["status"] for attempt in result["attempts"]}, {"not_configured"})
@@ -131,7 +139,9 @@ class CoreTests(unittest.TestCase):
             "title": "Local Song",
             "artist": "Local Artist",
         }
-        clip = AudioClip(samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test")
+        clip = AudioClip(
+            samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test"
+        )
         cfg = AppConfig(audd_api_token="", fingerprint_index_path="index.json")
 
         result = matcher.match_audio(clip, cfg)

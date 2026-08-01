@@ -8,9 +8,18 @@ from shazam_project.fingerprint import build_index
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build a local constellation-hash fingerprint index.")
-    parser.add_argument("--sources", type=Path, required=True, help="CSV with track_id/source_id, source_audio_path, title, artist")
-    parser.add_argument("--output", type=Path, default=Path("evaluation/results/fingerprint-index.json"))
+    parser = argparse.ArgumentParser(
+        description="Build a local constellation-hash fingerprint index."
+    )
+    parser.add_argument(
+        "--sources",
+        type=Path,
+        required=True,
+        help="CSV with track_id/source_id, source_audio_path, title, artist",
+    )
+    parser.add_argument(
+        "--output", type=Path, default=Path("evaluation/results/fingerprint-index.json")
+    )
     args = parser.parse_args()
 
     with args.sources.open(newline="", encoding="utf-8-sig") as handle:

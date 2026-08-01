@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -77,4 +77,11 @@ def missing_configuration(config: AppConfig) -> list[str]:
                 missing.append("FP_CALC_PATH (path does not exist)")
         except Exception:
             missing.append("FP_CALC_PATH (invalid)")
+
+    if config.fingerprint_index_path:
+        try:
+            if not Path(config.fingerprint_index_path).is_file():
+                missing.append("LOCAL_FINGERPRINT_INDEX (path does not exist)")
+        except (OSError, TypeError, ValueError):
+            missing.append("LOCAL_FINGERPRINT_INDEX (invalid)")
     return missing

@@ -1,2 +1,4 @@
-coverage>=7,<8
-pytest>=8,<9
+coverage>=7.6,<8
+pip-audit>=2.7,<3
+pytest>=9.0.3,<10
+ruff>=0.9,<1

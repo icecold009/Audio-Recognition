@@ -3,23 +3,29 @@ from __future__ import annotations
 from io import BytesIO
 from typing import Any
 
-from PIL import Image
 import requests
+from PIL import Image
 
 
 def show_result(result: dict[str, Any], open_image: bool = True) -> None:
     status = result.get("status")
     if status == "not_configured":
-        print("Recognition is not configured: add a provider credential or local fingerprint index.")
+        print(
+            "Recognition is not configured: add a provider credential or local fingerprint index."
+        )
         return
     if status == "invalid_audio":
-        print(f"Invalid audio [{result.get('error_code', 'invalid_audio')}]: {result.get('error', 'Audio was rejected.')}")
+        print(
+            f"Invalid audio [{result.get('error_code', 'invalid_audio')}]: {result.get('error', 'Audio was rejected.')}"
+        )
         return
     if status == "rate_limited":
         print(result.get("error", "Recognition is temporarily rate limited."))
         return
     if status == "error":
-        print(f"Recognition error [{result.get('error_code', 'error')}]: {result.get('error', 'Recognition failed.')}")
+        print(
+            f"Recognition error [{result.get('error_code', 'error')}]: {result.get('error', 'Recognition failed.')}"
+        )
         return
     if status == "no_match":
         print("No match found for the provided audio.")

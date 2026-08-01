@@ -56,7 +56,7 @@ The required local checks are:
 ```powershell
 python -m pytest -q
 python -m coverage run --branch --source=shazam_project,web,scripts -m pytest -q
-python -m coverage report --fail-under=50
+python -m coverage report --fail-under=70 --show-missing
 ```
 
 The real-world benchmark remains separate from the application smoke tests and requires licensed source tracks, recorded clips, and provider credentials.

@@ -154,6 +154,22 @@ evaluation/results/
 evaluation/source-cache/
 evaluation/sources.csv
 evaluation/manifest.csv
+evaluation/recordings/
+provider-cache/
+.provider-cache/
+
+# Benchmark audio, local recordings, and generated fingerprint indexes
+recordings/
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.ogg
+*.flac
+*.webm
+fingerprints.json
+fingerprint_index.json
+**/*fingerprint*index*.json
 
 # Spyder project settings
 .spyderproject

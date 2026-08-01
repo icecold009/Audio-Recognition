@@ -1,40 +1,38 @@
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import ipaddress
 import logging
-from pathlib import Path
+import os
 import secrets
 import shutil
 import sys
 import tempfile
 import threading
 import time
-from flask_cors import CORS
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
 from dotenv import load_dotenv
+from flask_cors import CORS
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from flask import Flask, jsonify, render_template, request
-from supabase import Client, create_client
 
 from shazam_project import matcher
 from shazam_project.config import AppConfig, load_config
 from shazam_project.recorder import AudioInputError, convert_with_ffmpeg, load_audio_file
-
+from supabase import Client, create_client
 
 load_dotenv()
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
 CORS_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv("CORS_ORIGINS", "").split(",")
-    if origin.strip()
+    origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()
 ]
 CORS(app, origins=CORS_ORIGINS)
 app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
@@ -48,6 +46,20 @@ CLIENT_ID_HMAC_SECRET = os.getenv("CLIENT_ID_HMAC_SECRET", "")
 APP_ENV = os.getenv("APP_ENV", "production").strip().lower()
 
 
+def _log_supabase_failure(operation: str, error_code: str) -> None:
+    logging.error("supabase_failure operation=%s error_code=%s", operation, error_code)
+
+
+def _create_supabase_client() -> Client | None:
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        return None
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    except Exception:
+        _log_supabase_failure("client_initialization", "client_initialization_failed")
+        return None
+
+
 def _int_env(name: str, default: int) -> int:
     try:
         return int(os.getenv(name, str(default)))
@@ -57,9 +69,7 @@ def _int_env(name: str, default: int) -> int:
 
 TRUSTED_PROXY_COUNT = max(0, _int_env("TRUSTED_PROXY_COUNT", 0))
 TRUSTED_PROXY_IPS = {
-    item.strip()
-    for item in os.getenv("TRUSTED_PROXY_IPS", "").split(",")
-    if item.strip()
+    item.strip() for item in os.getenv("TRUSTED_PROXY_IPS", "").split(",") if item.strip()
 }
 MEMORY_LIMITER_MAX_ENTRIES = max(1, _int_env("MEMORY_LIMITER_MAX_ENTRIES", 10000))
 MEMORY_LIMITER_TTL_SECONDS = max(60, _int_env("MEMORY_LIMITER_TTL_SECONDS", 86400))
@@ -67,11 +77,7 @@ _DEVELOPMENT_HMAC_SECRET = secrets.token_bytes(32)
 
 supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    except Exception:
-        logging.exception("Supabase client initialization failed")
-        supabase = None
+    supabase = _create_supabase_client()
 
 DAILY_LIMIT = max(1, _int_env("DAILY_LIMIT", 15))
 MONTHLY_LIMIT = max(1, _int_env("MONTHLY_LIMIT", 475))
@@ -132,10 +138,7 @@ def _rate_limited_decision(error_code: str, error: str, retry_after: int) -> dic
 
 def _purge_memory_quota(now: float) -> None:
     cutoff = now - MEMORY_LIMITER_TTL_SECONDS
-    expired = [
-        key for key, record in memory_quota_by_client.items()
-        if record.touched_at < cutoff
-    ]
+    expired = [key for key, record in memory_quota_by_client.items() if record.touched_at < cutoff]
     for key in expired:
         memory_quota_by_client.pop(key, None)
     if len(memory_quota_by_client) > MEMORY_LIMITER_MAX_ENTRIES:
@@ -213,13 +216,17 @@ def _get_client_ip() -> str:
     remote_addr = request.remote_addr or "unknown"
     if TRUSTED_PROXY_COUNT <= 0 or remote_addr not in TRUSTED_PROXY_IPS:
         return remote_addr
-    forwarded = [part.strip() for part in request.headers.get("X-Forwarded-For", "").split(",") if part.strip()]
+    forwarded = [
+        part.strip()
+        for part in request.headers.get("X-Forwarded-For", "").split(",")
+        if part.strip()
+    ]
     if len(forwarded) < TRUSTED_PROXY_COUNT:
         return remote_addr
     # REMOTE_ADDR is the immediate proxy. For N trusted hops, the N-1
     # right-most forwarded values must also be explicitly trusted proxies.
     trusted_forwarded_hops = (
-        forwarded[-(TRUSTED_PROXY_COUNT - 1):] if TRUSTED_PROXY_COUNT > 1 else []
+        forwarded[-(TRUSTED_PROXY_COUNT - 1) :] if TRUSTED_PROXY_COUNT > 1 else []
     )
     if any(address not in TRUSTED_PROXY_IPS for address in trusted_forwarded_hops):
         return remote_addr
@@ -232,7 +239,9 @@ def _get_client_ip() -> str:
 
 
 def _client_id_hash() -> str:
-    secret = CLIENT_ID_HMAC_SECRET.encode("utf-8") if CLIENT_ID_HMAC_SECRET else _DEVELOPMENT_HMAC_SECRET
+    secret = (
+        CLIENT_ID_HMAC_SECRET.encode("utf-8") if CLIENT_ID_HMAC_SECRET else _DEVELOPMENT_HMAC_SECRET
+    )
     return hmac.new(secret, _get_client_ip().encode("utf-8"), hashlib.sha256).hexdigest()
 
 
@@ -262,7 +271,7 @@ def _check_rate_limits(client_id_hash: str) -> dict:
             return {"blocked": False}
         return _quota_limit_decision(data)
     except Exception:
-        logging.exception("Supabase quota preflight failed")
+        _log_supabase_failure("quota_preflight", "quota_preflight_failed")
         return {"service_error": True}
 
 
@@ -274,7 +283,11 @@ def _quota_limit_decision(data: dict) -> dict:
         error = "Daily recognition limit reached."
     else:
         reason = "monthly_limit" if reason == "monthly_limit" else "quota_limit"
-        error = "Monthly recognition limit reached." if reason == "monthly_limit" else "Recognition quota reached."
+        error = (
+            "Monthly recognition limit reached."
+            if reason == "monthly_limit"
+            else "Recognition quota reached."
+        )
     return _rate_limited_decision(reason, error, int(data.get("retry_after_seconds", 1)))
 
 
@@ -303,7 +316,7 @@ def _consume_quota(client_id_hash: str) -> dict:
             return {"blocked": False}
         return _quota_limit_decision(data)
     except Exception:
-        logging.exception("Supabase quota RPC failed")
+        _log_supabase_failure("quota_consumption", "quota_consumption_failed")
         return {"service_error": True}
 
 
@@ -365,7 +378,9 @@ def _load_web_upload(upload, config: AppConfig):
 
 def _audio_error_response(exc: AudioInputError):
     status_code = 413 if exc.code in {"upload_too_large", "too_long"} else 400
-    return jsonify({"status": "invalid_audio", "error_code": exc.code, "error": exc.message}), status_code
+    return jsonify(
+        {"status": "invalid_audio", "error_code": exc.code, "error": exc.message}
+    ), status_code
 
 
 def _quota_unavailable_response():
@@ -382,9 +397,13 @@ def _rate_limit_response(decision: dict):
     payload = decision["payload"]
     retry_after = max(1, int(payload.get("retry_after_seconds", 1)))
     payload.setdefault("retry_after_seconds", retry_after)
-    return jsonify(payload), decision["status_code"], {
-        "Retry-After": str(retry_after),
-    }
+    return (
+        jsonify(payload),
+        decision["status_code"],
+        {
+            "Retry-After": str(retry_after),
+        },
+    )
 
 
 @app.route("/")
@@ -395,11 +414,19 @@ def index():
 @app.route("/api/match", methods=["POST"])
 def api_match():
     if INTERNAL_API_SECRET and request.headers.get("X-API-Secret") != INTERNAL_API_SECRET:
-        return jsonify({"status": "error", "error_code": "unauthorized", "error": "Unauthorized."}), 401
+        return jsonify(
+            {"status": "error", "error_code": "unauthorized", "error": "Unauthorized."}
+        ), 401
     if _quota_mode() == "unavailable":
         return _quota_unavailable_response()
     if "file" not in request.files:
-        return jsonify({"status": "invalid_audio", "error_code": "missing_upload", "error": "No audio file was uploaded."}), 400
+        return jsonify(
+            {
+                "status": "invalid_audio",
+                "error_code": "missing_upload",
+                "error": "No audio file was uploaded.",
+            }
+        ), 400
 
     client_id_hash = _client_id_hash()
     limit_check = _check_rate_limits(client_id_hash)
@@ -414,7 +441,13 @@ def api_match():
     except AudioInputError as exc:
         return _audio_error_response(exc)
     except Exception:
-        return jsonify({"status": "error", "error_code": "upload_failed", "error": "Audio upload could not be processed."}), 400
+        return jsonify(
+            {
+                "status": "error",
+                "error_code": "upload_failed",
+                "error": "Audio upload could not be processed.",
+            }
+        ), 400
 
     quota_result = _consume_quota(client_id_hash)
     if quota_result.get("service_error"):
@@ -424,7 +457,9 @@ def api_match():
     try:
         return jsonify(matcher.match_audio(clip, config))
     except Exception:
-        return jsonify({"status": "error", "error_code": "internal_error", "error": "Recognition failed."}), 500
+        return jsonify(
+            {"status": "error", "error_code": "internal_error", "error": "Recognition failed."}
+        ), 500
 
 
 @app.errorhandler(413)

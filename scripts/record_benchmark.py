@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import argparse
 import csv
-from pathlib import Path
 import subprocess
 import tempfile
+from pathlib import Path
 
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
-
 
 CLIP_LENGTHS = (4, 8, 15)
 SAMPLE_RATE = 44100
@@ -23,7 +22,17 @@ def _decode_source(source_path: Path) -> tuple[np.ndarray, int]:
             converted_path = Path(converted.name)
         try:
             subprocess.run(
-                ["ffmpeg", "-y", "-i", str(source_path), "-ar", str(SAMPLE_RATE), "-ac", "1", str(converted_path)],
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(source_path),
+                    "-ar",
+                    str(SAMPLE_RATE),
+                    "-ac",
+                    "1",
+                    str(converted_path),
+                ],
                 check=True,
                 capture_output=True,
                 timeout=30,
@@ -38,7 +47,9 @@ def _decode_source(source_path: Path) -> tuple[np.ndarray, int]:
     return array.reshape(-1), int(sample_rate)
 
 
-def _record_source(source: dict[str, str], output_dir: Path, input_device: int | str, output_device: int | str) -> list[dict[str, str]]:
+def _record_source(
+    source: dict[str, str], output_dir: Path, input_device: int | str, output_device: int | str
+) -> list[dict[str, str]]:
     source_path = Path(source["source_audio_path"])
     samples, sample_rate = _decode_source(source_path)
     target_samples = int(15 * sample_rate)
@@ -78,17 +89,32 @@ def _record_source(source: dict[str, str], output_dir: Path, input_device: int |
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Record 4/8/15-second speaker-to-microphone benchmark clips.")
-    parser.add_argument("--sources", type=Path, required=True, help="CSV with source_id,source_audio_path,title,artist,genre,era,condition")
+    parser = argparse.ArgumentParser(
+        description="Record 4/8/15-second speaker-to-microphone benchmark clips."
+    )
+    parser.add_argument(
+        "--sources",
+        type=Path,
+        required=True,
+        help="CSV with source_id,source_audio_path,title,artist,genre,era,condition",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("evaluation/clips"))
     parser.add_argument("--manifest", type=Path, default=Path("evaluation/manifest.csv"))
-    parser.add_argument("--input-device", required=True, help="sounddevice input device index or name")
-    parser.add_argument("--output-device", required=True, help="sounddevice output device index or name")
+    parser.add_argument(
+        "--input-device", required=True, help="sounddevice input device index or name"
+    )
+    parser.add_argument(
+        "--output-device", required=True, help="sounddevice output device index or name"
+    )
     parser.add_argument("--yes", action="store_true", help="do not pause before each recording")
     args = parser.parse_args()
 
-    input_device: int | str = int(args.input_device) if args.input_device.isdigit() else args.input_device
-    output_device: int | str = int(args.output_device) if args.output_device.isdigit() else args.output_device
+    input_device: int | str = (
+        int(args.input_device) if args.input_device.isdigit() else args.input_device
+    )
+    output_device: int | str = (
+        int(args.output_device) if args.output_device.isdigit() else args.output_device
+    )
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     with args.sources.open(newline="", encoding="utf-8-sig") as handle:
@@ -99,7 +125,9 @@ def main() -> int:
     rows: list[dict[str, str]] = []
     for source in sources:
         if not args.yes:
-            input(f"Press Enter when the room and microphone are ready for {source['source_id']}...")
+            input(
+                f"Press Enter when the room and microphone are ready for {source['source_id']}..."
+            )
         rows.extend(_record_source(source, args.output_dir, input_device, output_device))
 
     args.manifest.parent.mkdir(parents=True, exist_ok=True)

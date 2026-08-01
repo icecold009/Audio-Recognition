@@ -56,7 +56,9 @@ def main() -> int:
         return 1
 
     print(f"FFT diagnostic visualization saved to {fft_output}")
-    print("FFT is diagnostic only; song identification uses provider matching or spectrogram peak hash pairs.")
+    print(
+        "FFT is diagnostic only; song identification uses provider matching or spectrogram peak hash pairs."
+    )
 
     try:
         result = match_audio(clip, config)
