@@ -42,6 +42,14 @@ class WebRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"--color-bg", response.data)
 
+    def test_status_ui_uses_quota_mode_and_not_undefined_usage_fields(self):
+        response = self.client.get("/static/app.js")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"quota_mode", response.data)
+        self.assertNotIn(b"daily_used", response.data)
+        self.assertNotIn(b"monthly_used", response.data)
+
     def test_status_reports_backend_and_runtime_configuration(self):
         cfg = AppConfig(audd_api_token="", acoustid_api_key="", rapidapi_key="RAPID")
         with patch.object(web_app, "load_config", return_value=cfg), patch.object(
@@ -61,7 +69,7 @@ class WebRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["status"], "invalid_audio")
 
-    def test_match_accepts_configured_browser_origin_without_exposing_secret(self):
+    def test_match_accepts_authenticated_browser_request_without_exposing_secret(self):
         cfg = AppConfig(audd_api_token="TOKEN")
         result = {"status": "matched", "title": "Test Song", "artist": "Tester"}
         with patch.object(web_app, "INTERNAL_API_SECRET", "server-only-secret"), patch.object(

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
+import ipaddress
 import logging
 from pathlib import Path
 import secrets
@@ -215,7 +216,19 @@ def _get_client_ip() -> str:
     forwarded = [part.strip() for part in request.headers.get("X-Forwarded-For", "").split(",") if part.strip()]
     if len(forwarded) < TRUSTED_PROXY_COUNT:
         return remote_addr
-    return forwarded[-TRUSTED_PROXY_COUNT]
+    # REMOTE_ADDR is the immediate proxy. For N trusted hops, the N-1
+    # right-most forwarded values must also be explicitly trusted proxies.
+    trusted_forwarded_hops = (
+        forwarded[-(TRUSTED_PROXY_COUNT - 1):] if TRUSTED_PROXY_COUNT > 1 else []
+    )
+    if any(address not in TRUSTED_PROXY_IPS for address in trusted_forwarded_hops):
+        return remote_addr
+    client_address = forwarded[-TRUSTED_PROXY_COUNT]
+    try:
+        ipaddress.ip_address(client_address)
+    except ValueError:
+        return remote_addr
+    return client_address
 
 
 def _client_id_hash() -> str:
@@ -224,14 +237,45 @@ def _client_id_hash() -> str:
 
 
 def _check_rate_limits(client_id_hash: str) -> dict:
-    """Perform a non-consuming development preflight check.
-
-    Production quota decisions happen only in the atomic RPC after valid audio
-    has been decoded, so invalid uploads never consume database quota.
-    """
+    """Perform a non-consuming check before accepting upload work."""
     if APP_ENV == "development":
         return _memory_quota_decision(client_id_hash, consume=False)
-    return {"blocked": False}
+    if not _production_quota_configured():
+        return {"service_error": True}
+    try:
+        response = supabase.rpc(
+            "check_api_quota",
+            {
+                "p_client_id_hash": client_id_hash,
+                "p_daily_limit": DAILY_LIMIT,
+                "p_monthly_limit": MONTHLY_LIMIT,
+                "p_cooldown_seconds": COOLDOWN_SECONDS,
+                "p_now": _utc_now().isoformat(),
+            },
+        ).execute()
+        data = response.data
+        if isinstance(data, list):
+            data = data[0] if data else None
+        if not isinstance(data, dict) or "allowed" not in data:
+            raise RuntimeError("quota preflight returned an invalid response")
+        if data["allowed"]:
+            return {"blocked": False}
+        return _quota_limit_decision(data)
+    except Exception:
+        logging.exception("Supabase quota preflight failed")
+        return {"service_error": True}
+
+
+def _quota_limit_decision(data: dict) -> dict:
+    reason = str(data.get("reason", "quota_limit"))
+    if reason == "cooldown":
+        error = "Please wait before trying again."
+    elif reason == "daily_limit":
+        error = "Daily recognition limit reached."
+    else:
+        reason = "monthly_limit" if reason == "monthly_limit" else "quota_limit"
+        error = "Monthly recognition limit reached." if reason == "monthly_limit" else "Recognition quota reached."
+    return _rate_limited_decision(reason, error, int(data.get("retry_after_seconds", 1)))
 
 
 def _consume_quota(client_id_hash: str) -> dict:
@@ -257,15 +301,7 @@ def _consume_quota(client_id_hash: str) -> dict:
             raise RuntimeError("quota RPC returned an invalid response")
         if data["allowed"]:
             return {"blocked": False}
-        reason = str(data.get("reason", "quota_limit"))
-        if reason == "cooldown":
-            error = "Please wait before trying again."
-        elif reason == "daily_limit":
-            error = "Daily recognition limit reached."
-        else:
-            reason = "monthly_limit" if reason == "monthly_limit" else "quota_limit"
-            error = "Monthly recognition limit reached." if reason == "monthly_limit" else "Recognition quota reached."
-        return _rate_limited_decision(reason, error, int(data.get("retry_after_seconds", 1)))
+        return _quota_limit_decision(data)
     except Exception:
         logging.exception("Supabase quota RPC failed")
         return {"service_error": True}
@@ -367,6 +403,8 @@ def api_match():
 
     client_id_hash = _client_id_hash()
     limit_check = _check_rate_limits(client_id_hash)
+    if limit_check.get("service_error"):
+        return _quota_unavailable_response()
     if limit_check["blocked"]:
         return _rate_limit_response(limit_check)
 

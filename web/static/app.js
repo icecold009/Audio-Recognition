@@ -376,8 +376,9 @@ async function refreshStatus() {
             `ffmpeg on PATH: ${s.ffmpeg_on_path ? 'yes' : 'no'}; ` +
             `AudD token: ${s.audd_configured ? 'configured' : 'not configured'}; ` +
             `Supabase: ${s.supabase_configured ? 'configured' : 'not configured'}; ` +
-            `Daily: ${s.daily_used}/${s.daily_limit}; ` +
-            `Monthly: ${s.monthly_used}/${s.monthly_limit}; ` +
+            `Quota: ${s.quota_mode || 'unknown'}; ` +
+            `Production-grade: ${s.production_grade_quotas_enabled ? 'enabled' : 'disabled'}; ` +
+            `Limits: ${s.daily_limit}/day, ${s.monthly_limit}/month; ` +
             `Cooldown: ${s.cooldown_seconds}s`;
     } catch (err) {
         statusDiv.innerText = 'Failed to fetch status: ' + err;
