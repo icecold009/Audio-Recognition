@@ -78,7 +78,7 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 ### Main task 6 — Dependency, CI, and repository hygiene
 
 - [x] Run pytest and coverage in GitHub Actions on every push and pull request.
-- [ ] Verify the remote PR workflow: this branch's new CI run is pending after push; local evidence is 117 tests and 73% branch coverage.
+- [ ] Verify the remote PR workflow: this branch's new CI run is pending after push; post-rebase local evidence is 146 tests and 74% branch coverage.
 - [ ] Enable Codecov for this repository; no successful upload has been established, so integration remains separate while `coverage.xml` remains an artifact.
 - [x] Verify Python tests in a clean supported environment.
 - [x] Pin or constrain Python dependencies and add Python lint/static checks to CI.
@@ -204,7 +204,7 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 - [x] Test rate-limit responses and quota accounting through the public route.
 - [x] Add tests for `load_config()` and `missing_configuration()` including `.env`, missing keys, invalid `FP_CALC_PATH`, and provider combinations.
 - [x] Add microphone tests using a mocked `sounddevice` implementation, including invalid duration, invalid sample rate, capture failure, and cleanup. Prompt 3 also proves configured too-short/too-long requests do not start recording.
-- [x] Add coverage reporting with `coverage.py`, a 70% minimum threshold, and a preserved `coverage.xml` artifact. Current measured branch coverage is 73% across `shazam_project`, `web`, and `scripts`; Codecov remains unverified.
+- [x] Add coverage reporting with `coverage.py`, a 70% minimum threshold, and a preserved `coverage.xml` artifact. Current post-rebase measured branch coverage is 74% across `shazam_project`, `web`, and `scripts`; Codecov remains unverified.
 
 ### Browser behavior quality
 
@@ -270,7 +270,7 @@ Record evidence here as work lands:
 |---|---|---|---|
 | 2026-08-01 | Production rate limits | Added `production_rate_limits` migration through the Supabase CLI; private row-locked quota RPC, RLS with no public policies, server-only service-role access, HMAC client identifiers, fail-closed 503 handling, development fallback, trusted-proxy configuration, direct API-secret authentication, and Retry-After responses. | 93 tests passed; 68% total branch coverage; compileall and diff checks passed. Local/linked SQL execution remains unavailable: Docker is not running and the linked `shazam-project` is inactive; linked advisors returned no lints and migration listing timed out. |
 | 2026-08-01 | Prompt 3 cleanup and review fixes | Flask status display restored RapidAPI and Supabase fields; local `no_match` uses the shared `result: null` shape; all providers receive normalized mono float32 audio; provider diagnostics are safe; rate limits run before upload processing; fixed 16-bit provider WAV encoding is documented; README/TODO record the validated contract and Prompt 4 production blockers. | 73 tests passed; 66% total branch coverage; compileall and diff checks passed locally; CI and `coverage.xml` artifact are pending this push; Codecov upload previously reported `Repository not found` and remains deferred |
-| 2026-08-01 | CI/test hardening | Added configuration, microphone, Flask, generated-WAV, provider-fallback, safe-rendering, dependency, Ruff, and secret-scan gates; removed committed desktop.ini files, generated FFT artifact, and obsolete development plan. | 117 tests passed; 73% total branch coverage; Ruff format/lint, pip-audit, compileall, and diff checks passed locally; `coverage.xml` written; Gitleaks local binary unavailable, but the pinned-major GitHub Action is configured; provider credentials, Supabase, FFmpeg, fpcalc, microphone hardware, and real-world benchmark are intentionally excluded |
+| 2026-08-01 | CI/test hardening | Added configuration, microphone, Flask, generated-WAV, provider-fallback, safe-rendering, dependency, Ruff, and secret-scan gates; removed committed desktop.ini files, generated FFT artifact, and obsolete development plan. | Post-rebase 146 tests passed; 74% total branch coverage; Ruff format/lint, pip-audit, compileall, and diff checks passed locally; `coverage.xml` written; Gitleaks local binary unavailable, but the pinned-major GitHub Action is configured; provider credentials, Supabase, FFmpeg, fpcalc, microphone hardware, and real-world benchmark are intentionally excluded |
 | 2026-07-31 | Initial repository review | `main` at `77d159f`; accuracy remains `X / Y`; Python execution was unavailable locally because the existing virtualenv points to an inaccessible interpreter. | Baseline recorded |
 | 2026-07-31 | P0/P1 web and matcher slice | `feature/evaluation-todo`; 10 Python unit/integration tests passed; dispatcher fallback, browser-origin auth, upload/audio limits, dotenv loading, and runtime status fields were added. | Verified; benchmark, full web coverage, and production deployment remain open |
 | 2026-07-31 | Benchmark tooling slice | `scripts/record_benchmark.py`, `scripts/benchmark.py`, `evaluation/README.md`, and aggregation tests added; 13 Python tests pass. Machine has speaker/microphone devices, FFmpeg, and `fpcalc`; only RapidAPI is configured. | Tooling verified; real corpus and two provider credentials remain required |

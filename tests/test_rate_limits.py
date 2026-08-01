@@ -1,20 +1,24 @@
 from __future__ import annotations
 
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
-import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from web import app as web_app
 from shazam_project.recorder import AudioInputError
+from web import app as web_app
 
 from .test_web import _wav_bytes
 
-
-MIGRATION_PATH = Path(__file__).parents[1] / "supabase" / "migrations" / "20260801145213_production_rate_limits.sql"
+MIGRATION_PATH = (
+    Path(__file__).parents[1]
+    / "supabase"
+    / "migrations"
+    / "20260801145213_production_rate_limits.sql"
+)
 
 
 @pytest.fixture(autouse=True)
@@ -60,9 +64,9 @@ def test_quota_functions_are_service_role_only():
         revoke = f"revoke all on function public.{function_name}"
         grant = f"grant execute on function public.{function_name}"
         assert revoke in sql
-        assert "from public, anon, authenticated" in sql[sql.index(revoke):]
+        assert "from public, anon, authenticated" in sql[sql.index(revoke) :]
         assert grant in sql
-        assert "to service_role" in sql[sql.index(grant):]
+        assert "to service_role" in sql[sql.index(grant) :]
 
 
 def test_development_daily_limit_is_stable(monkeypatch):
@@ -126,9 +130,11 @@ def test_rate_limited_response_sets_retry_after_header(monkeypatch):
 
 @pytest.mark.parametrize("error_code", ["cooldown", "daily_limit", "monthly_limit"])
 def test_all_rate_limit_codes_have_retry_after_headers(monkeypatch, error_code):
-    monkeypatch.setattr(web_app, "_check_rate_limits", lambda _client: web_app._rate_limited_decision(
-        error_code, "Rate limit reached.", 17
-    ))
+    monkeypatch.setattr(
+        web_app,
+        "_check_rate_limits",
+        lambda _client: web_app._rate_limited_decision(error_code, "Rate limit reached.", 17),
+    )
     monkeypatch.setattr(web_app, "_load_web_upload", lambda *_args: object())
 
     response = web_app.app.test_client().post(
@@ -247,11 +253,17 @@ def test_blocked_production_preflight_never_loads_upload(monkeypatch):
             return self
 
         def execute(self):
-            return type("Response", (), {"data": {
-                "allowed": False,
-                "reason": "daily_limit",
-                "retry_after_seconds": 90,
-            }})()
+            return type(
+                "Response",
+                (),
+                {
+                    "data": {
+                        "allowed": False,
+                        "reason": "daily_limit",
+                        "retry_after_seconds": 90,
+                    }
+                },
+            )()
 
     monkeypatch.setattr(web_app, "APP_ENV", "production")
     monkeypatch.setattr(web_app, "SUPABASE_URL", "https://project.supabase.co")

@@ -18,9 +18,12 @@ from .test_audio_pipeline import config, valid_samples
 
 @pytest.fixture(autouse=True)
 def clear_web_rate_state():
-    web_app.last_request_by_ip.clear()
+    previous_env = web_app.APP_ENV
+    web_app.APP_ENV = "development"
+    web_app.memory_quota_by_client.clear()
     yield
-    web_app.last_request_by_ip.clear()
+    web_app.memory_quota_by_client.clear()
+    web_app.APP_ENV = previous_env
 
 
 def _generated_wav(seconds: float = 1.25, sample_rate: int = 8000) -> bytes:
@@ -53,7 +56,7 @@ def test_status_reports_runtime_capabilities_without_secrets(monkeypatch):
     assert body["supported_formats"] == ["wav", "mp3", "m4a", "aac", "ogg", "flac", "webm"]
     assert body["ffmpeg_on_path"] is False
     assert body["fpcalc_on_path"] is False
-    assert "SUPABASE_KEY" not in json.dumps(body)
+    assert "SUPABASE_SERVICE_ROLE_KEY" not in json.dumps(body)
 
 
 def test_match_returns_safe_result_for_incomplete_provider_metadata(monkeypatch):
@@ -131,20 +134,26 @@ def test_rate_limit_response_stops_processing(monkeypatch):
     loader.assert_not_called()
 
 
-def test_supabase_failure_does_not_leak_details_in_status(monkeypatch, caplog):
+def test_supabase_failure_fails_closed_without_leaking_details(monkeypatch, caplog):
     class BrokenSupabase:
-        def table(self, *_args, **_kwargs):
+        def rpc(self, *_args, **_kwargs):
             raise RuntimeError("supabase private endpoint")
 
     monkeypatch.setattr(web_app, "load_config", lambda: config())
+    monkeypatch.setattr(web_app, "APP_ENV", "production")
+    monkeypatch.setattr(web_app, "SUPABASE_URL", "https://project.supabase.co")
+    monkeypatch.setattr(web_app, "SUPABASE_SERVICE_ROLE_KEY", "server-only")
+    monkeypatch.setattr(web_app, "CLIENT_ID_HMAC_SECRET", "separate-secret")
     monkeypatch.setattr(web_app, "supabase", BrokenSupabase())
 
     with caplog.at_level("ERROR"):
-        response = web_app.app.test_client().get("/api/status")
+        response = web_app.app.test_client().post(
+            "/api/match", data=_upload(), content_type="multipart/form-data"
+        )
 
-    assert response.status_code == 200
+    assert response.status_code == 503
+    assert response.get_json()["error_code"] == "quota_unavailable"
     assert "supabase private endpoint" not in response.get_data(as_text=True)
-    assert "supabase private endpoint" not in caplog.text
 
 
 def test_missing_backend_configuration_is_visible_without_credentials(monkeypatch):

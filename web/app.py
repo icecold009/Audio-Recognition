@@ -1,20 +1,18 @@
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import ipaddress
 import logging
-from pathlib import Path
+import os
 import secrets
 import shutil
 import sys
 import tempfile
 import threading
 import time
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -24,11 +22,11 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from flask import Flask, jsonify, render_template, request
-from supabase import Client, create_client
 
 from shazam_project import matcher
 from shazam_project.config import AppConfig, load_config
 from shazam_project.recorder import AudioInputError, convert_with_ffmpeg, load_audio_file
+from supabase import Client, create_client
 
 load_dotenv()
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -57,9 +55,7 @@ def _int_env(name: str, default: int) -> int:
 
 TRUSTED_PROXY_COUNT = max(0, _int_env("TRUSTED_PROXY_COUNT", 0))
 TRUSTED_PROXY_IPS = {
-    item.strip()
-    for item in os.getenv("TRUSTED_PROXY_IPS", "").split(",")
-    if item.strip()
+    item.strip() for item in os.getenv("TRUSTED_PROXY_IPS", "").split(",") if item.strip()
 }
 MEMORY_LIMITER_MAX_ENTRIES = max(1, _int_env("MEMORY_LIMITER_MAX_ENTRIES", 10000))
 MEMORY_LIMITER_TTL_SECONDS = max(60, _int_env("MEMORY_LIMITER_TTL_SECONDS", 86400))
@@ -132,10 +128,7 @@ def _rate_limited_decision(error_code: str, error: str, retry_after: int) -> dic
 
 def _purge_memory_quota(now: float) -> None:
     cutoff = now - MEMORY_LIMITER_TTL_SECONDS
-    expired = [
-        key for key, record in memory_quota_by_client.items()
-        if record.touched_at < cutoff
-    ]
+    expired = [key for key, record in memory_quota_by_client.items() if record.touched_at < cutoff]
     for key in expired:
         memory_quota_by_client.pop(key, None)
     if len(memory_quota_by_client) > MEMORY_LIMITER_MAX_ENTRIES:
@@ -213,13 +206,17 @@ def _get_client_ip() -> str:
     remote_addr = request.remote_addr or "unknown"
     if TRUSTED_PROXY_COUNT <= 0 or remote_addr not in TRUSTED_PROXY_IPS:
         return remote_addr
-    forwarded = [part.strip() for part in request.headers.get("X-Forwarded-For", "").split(",") if part.strip()]
+    forwarded = [
+        part.strip()
+        for part in request.headers.get("X-Forwarded-For", "").split(",")
+        if part.strip()
+    ]
     if len(forwarded) < TRUSTED_PROXY_COUNT:
         return remote_addr
     # REMOTE_ADDR is the immediate proxy. For N trusted hops, the N-1
     # right-most forwarded values must also be explicitly trusted proxies.
     trusted_forwarded_hops = (
-        forwarded[-(TRUSTED_PROXY_COUNT - 1):] if TRUSTED_PROXY_COUNT > 1 else []
+        forwarded[-(TRUSTED_PROXY_COUNT - 1) :] if TRUSTED_PROXY_COUNT > 1 else []
     )
     if any(address not in TRUSTED_PROXY_IPS for address in trusted_forwarded_hops):
         return remote_addr
@@ -232,7 +229,9 @@ def _get_client_ip() -> str:
 
 
 def _client_id_hash() -> str:
-    secret = CLIENT_ID_HMAC_SECRET.encode("utf-8") if CLIENT_ID_HMAC_SECRET else _DEVELOPMENT_HMAC_SECRET
+    secret = (
+        CLIENT_ID_HMAC_SECRET.encode("utf-8") if CLIENT_ID_HMAC_SECRET else _DEVELOPMENT_HMAC_SECRET
+    )
     return hmac.new(secret, _get_client_ip().encode("utf-8"), hashlib.sha256).hexdigest()
 
 
@@ -274,7 +273,11 @@ def _quota_limit_decision(data: dict) -> dict:
         error = "Daily recognition limit reached."
     else:
         reason = "monthly_limit" if reason == "monthly_limit" else "quota_limit"
-        error = "Monthly recognition limit reached." if reason == "monthly_limit" else "Recognition quota reached."
+        error = (
+            "Monthly recognition limit reached."
+            if reason == "monthly_limit"
+            else "Recognition quota reached."
+        )
     return _rate_limited_decision(reason, error, int(data.get("retry_after_seconds", 1)))
 
 
@@ -384,9 +387,13 @@ def _rate_limit_response(decision: dict):
     payload = decision["payload"]
     retry_after = max(1, int(payload.get("retry_after_seconds", 1)))
     payload.setdefault("retry_after_seconds", retry_after)
-    return jsonify(payload), decision["status_code"], {
-        "Retry-After": str(retry_after),
-    }
+    return (
+        jsonify(payload),
+        decision["status_code"],
+        {
+            "Retry-After": str(retry_after),
+        },
+    )
 
 
 @app.route("/")
@@ -397,7 +404,9 @@ def index():
 @app.route("/api/match", methods=["POST"])
 def api_match():
     if INTERNAL_API_SECRET and request.headers.get("X-API-Secret") != INTERNAL_API_SECRET:
-        return jsonify({"status": "error", "error_code": "unauthorized", "error": "Unauthorized."}), 401
+        return jsonify(
+            {"status": "error", "error_code": "unauthorized", "error": "Unauthorized."}
+        ), 401
     if _quota_mode() == "unavailable":
         return _quota_unavailable_response()
     if "file" not in request.files:
