@@ -107,7 +107,7 @@ Blue-cyan is Shazam's signature color. Using deep near-black surfaces (not pure 
 
 ## Iconography
 
-- **Icon library:** [Lucide React](https://lucide.dev/) — clean, consistent, 24px base grid
+- **Icon library:** Inline SVG icons — clean, consistent, 24px base grid
 - **Mic icon:** Custom animated SVG — not a Lucide icon; pulsing ring animation on LISTENING state
 - **All icon-only buttons:** Must have `aria-label` and tooltip on hover/focus
 - **Size:** 20px for nav/UI icons, 24px for action icons, 48px for the main mic CTA
@@ -297,4 +297,3 @@ The browser UI should follow these concrete responsive rules so it works cleanly
 - **Spotify:** Card design language, dark surfaces, album art treatment
 - **Linear:** Minimal layout, fast interactions, keyboard-accessible
 - **Apple Music:** Typography hierarchy, whitespace, smooth transitions
-

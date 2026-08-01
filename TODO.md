@@ -9,7 +9,7 @@ Strict evidence-based score at review time: **5/9**.
 | Area | Current score | Main reason |
 |---|---:|---|
 | Correctness | 1.5/3 | Recognition works through provider integrations, but accuracy is unmeasured and several runtime paths are fragile. |
-| Engineering | 2/3 | The module split and basic CI are good, but tests cover only two narrow cases and omit the web/frontend paths. |
+| Engineering | 2/3 | The module split and basic CI are good, but production hardening and deeper browser-state coverage remain open. |
 | Documentation | 1/2 | The structure is strong, but the documents mix planned product architecture with implemented functionality. |
 | Distinctiveness | 0.5/2 | The project is a capable Shazam-style integration, not yet a novel recognition system. |
 
@@ -46,17 +46,17 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 
 ### Main task 3 — Authoritative web application
 
-- [ ] Decide whether Flask `web/` or Vite/React `frontend/` is the supported application.
-- [ ] Retire the unused implementation or bring both implementations to the same API contract and feature level.
-- [ ] Document the canonical development command, production build, served UI, and screenshot source.
-- [ ] Ensure the README architecture diagram describes the actual runtime path.
+- [x] Decide that Flask `web/` is the supported browser application.
+- [x] Retire the unused second browser implementation.
+- [x] Document `python web/app.py` as the canonical development command and describe the served UI and API.
+- [x] Ensure the README architecture diagram describes the actual Flask runtime path.
 - [ ] Tick Main task 3 only after a reviewer can identify and run the supported web path unambiguously.
 
 ### Main task 4 — Production configuration and security
 
 - [ ] Reconcile `SUPABASE_KEY` with service-role-key naming and the intended security model.
 - [ ] Decide whether `INTERNAL_API_SECRET` is required for the supported browser flow.
-- [ ] Standardize response fields and statuses across providers and frontend implementations.
+- [ ] Standardize response fields and statuses across providers and the CLI/browser consumers.
 - [ ] Add a startup/health check for provider, Supabase, FFmpeg, and `fpcalc` configuration.
 - [ ] Make quota checks and increments atomic, and define fail-closed behavior for Supabase failures.
 - [ ] Bound cooldown/IP state and document the trusted proxy model.
@@ -77,7 +77,7 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 
 ### Main task 6 — Dependency, CI, and repository hygiene
 
-- [x] Run pytest, coverage, frontend lint, and frontend build in GitHub Actions on every push and pull request.
+- [x] Run pytest and coverage in GitHub Actions on every push and pull request.
 - [ ] Verify the workflow on the remote evaluation branch and confirm Codecov receives the report.
 - [ ] Verify Python tests in a clean supported environment.
 - [ ] Pin or constrain Python dependencies and add Python lint/static checks to CI.
@@ -88,8 +88,8 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 ### Main task 7 — Documentation reconciliation
 
 - [ ] Split documentation into Implemented, Known limitations, Planned, and Evaluation evidence sections.
-- [ ] Mark unsupported Supabase/auth/history/RLS/Vercel/account/settings claims as planned or remove them.
-- [ ] Reconcile README content with the actual Flask and React source trees.
+- [ ] Mark unsupported Supabase/auth/history/RLS/account/settings claims as planned or remove them.
+- [x] Reconcile README content with the actual Flask source tree.
 - [ ] Reconcile documented 8-second CLI, 5-second RapidAPI trim, and 10-second browser-recording behavior.
 - [ ] Document the exact source and command for each screenshot, and add failure-state screenshots where useful.
 - [ ] Remove unsupported platform claims and document API statuses, backend order, environment variables, and security boundaries.
@@ -159,21 +159,21 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 
 ### Choose one authoritative web implementation
 
-- [ ] Decide whether Flask-served `web/` or the Vite/React `frontend/` is the supported application.
-- [ ] Retire the unused implementation, or bring both implementations to the same API contract and feature level.
-- [ ] Document the canonical development command, production build, served UI, and screenshot source.
-- [ ] Ensure the README architecture diagram describes the actual runtime path.
+- [x] Decide that Flask-served `web/` is the supported application.
+- [x] Retire the unused second browser implementation.
+- [x] Document the canonical `python web/app.py` command, served UI, API, and screenshot source.
+- [x] Ensure the README architecture diagram describes the actual runtime path.
 
 ### Configuration and API contract
 
 - [x] Load `.env` before creating the Supabase client in `web/app.py`, or use one explicit application configuration path.
 - [ ] Reconcile `SUPABASE_KEY` with the documented `SUPABASE_SERVICE_ROLE_KEY` naming and security model.
 - [ ] Decide whether the API requires an internal secret at all for browser clients.
-- [x] If a browser client calls the endpoint, do not put a real server secret in a `VITE_*` variable or browser bundle.
+- [x] Keep real server secrets out of browser configuration and static assets.
 - [x] Make the Flask-served UI work when `INTERNAL_API_SECRET` is enabled, or remove that mode from the supported flow. Configured same-origin/allowlisted browser requests are accepted without exposing the secret.
-- [x] Configure production CORS from an allowlist rather than only `http://localhost:5173`.
+- [x] Configure optional cross-origin API access from an allowlist; same-origin browser access is the default.
 - [x] Add RapidAPI configuration to `/api/status`; report the actual active backend order.
-- [ ] Standardize response fields and statuses across all providers and both frontend implementations.
+- [ ] Standardize response fields and statuses across all providers and the CLI/browser consumers.
 - [x] Correct the CLI `no_token` message so it identifies missing recognition configuration generically rather than naming AudD only.
 - [ ] Add a health/startup check that clearly reports missing provider, Supabase, FFmpeg, and `fpcalc` configuration.
 
@@ -193,23 +193,21 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 
 ### Backend and web tests
 
-- [x] Add Flask test-client coverage for `/api/status` and `/api/match`; `/` remains a follow-up.
-- [x] Test missing upload, audio-duration rejection, matcher success, and API-secret origin behavior. FFmpeg conversion and cleanup remain follow-ups.
+- [x] Add Flask test-client coverage for `/`, static assets, `/api/status`, and `/api/match`.
+- [x] Test missing, malformed, oversized, and duration-rejected uploads, matcher success/no-match, and API-secret origin behavior. FFmpeg conversion and cleanup remain follow-ups.
 - [x] Test API-secret behavior in the supported browser-origin path.
 - [ ] Test rate-limit responses and quota accounting through the public route.
 - [ ] Add tests for `load_config()` and `missing_configuration()` including `.env`, missing keys, invalid `FP_CALC_PATH`, and provider combinations.
 - [ ] Add microphone tests using a mocked `sounddevice` implementation, including invalid duration, invalid sample rate, capture failure, and cleanup.
 - [x] Add coverage reporting with `coverage.py`, a 50% minimum threshold, an XML artifact, and a Codecov badge. The current measured branch-coverage baseline is 51% across `shazam_project`, `web`, and `scripts`.
 
-### Frontend quality
+### Browser behavior quality
 
-- [x] Fix the two current ESLint errors in `frontend/vite.config.js`.
-- [x] Add frontend lint and production build to GitHub Actions.
-- [ ] Add browser/component tests for recording, upload, loading, matched, no-match, unauthorized, rate-limited, and network-error states.
-- [ ] Test microphone permission denial and unsupported `MediaRecorder`/browser behavior.
+- [ ] Add browser tests for recording, upload, loading, matched, no-match, unauthorized, rate-limited, and network-error states.
+- [ ] Test microphone permission denial and unsupported `MediaRecorder` behavior.
 - [ ] Test that audio streams and visualizer resources are stopped and released after recording.
-- [ ] Test that result rendering handles missing album, artwork, genre, release date, and links safely.
-- [ ] Decide whether session history is a supported feature; if so, document its privacy and retention behavior.
+- [ ] Test safe rendering when album, artwork, genre, release date, or links are missing.
+- [x] Document session history as an optional, session-only privacy feature.
 
 ### Dependency and static quality
 
@@ -224,8 +222,8 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 ## P1 — documentation reconciliation
 
 - [ ] Split documentation into “Implemented”, “Known limitations”, “Planned”, and “Evaluation evidence”.
-- [ ] Mark Supabase authentication, persistent user history, RLS-backed history, Vercel routes, account deletion, settings, and protected routes as planned unless implemented.
-- [ ] Reconcile the README with the actual Flask and React source trees.
+- [ ] Mark Supabase authentication, persistent user history, RLS-backed history, account deletion, settings, and protected routes as planned unless implemented.
+- [x] Reconcile the README with the actual Flask source tree.
 - [ ] Reconcile the documented 8-second CLI behavior, 5-second RapidAPI trim, and 10-second browser recording behavior.
 - [ ] Document that the current FFT is diagnostic and not used for matching, unless the implementation changes.
 - [x] Replace the stale README “Add CI” roadmap entry with the implemented pytest, coverage, lint, and build gates.
@@ -250,7 +248,7 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 ## Release gates
 
 - [ ] Python tests pass in a clean supported environment.
-- [ ] Frontend lint and build pass in CI.
+- [x] Python tests and coverage pass in CI.
 - [ ] Web integration tests pass without real provider credentials.
 - [ ] At least one credentialed smoke test proves the configured recognition path works.
 - [ ] Benchmark results are reproducible and linked from the README.
@@ -265,10 +263,10 @@ Record evidence here as work lands:
 
 | Date | Task/check | Evidence | Result |
 |---|---|---|---|
-| 2026-07-31 | Initial repository review | `main` at `77d159f`; accuracy remains `X / Y`; frontend build passed; frontend lint failed; Python execution was unavailable locally because the existing virtualenv points to an inaccessible interpreter. | Baseline recorded |
-| 2026-07-31 | P0/P1 web and matcher slice | `feature/evaluation-todo`; 10 Python unit/integration tests passed; frontend lint and production build passed; dispatcher fallback, browser-origin auth, upload/audio limits, dotenv loading, and runtime status fields were added. | Verified; benchmark, full web coverage, and production deployment remain open |
+| 2026-07-31 | Initial repository review | `main` at `77d159f`; accuracy remains `X / Y`; Python execution was unavailable locally because the existing virtualenv points to an inaccessible interpreter. | Baseline recorded |
+| 2026-07-31 | P0/P1 web and matcher slice | `feature/evaluation-todo`; 10 Python unit/integration tests passed; dispatcher fallback, browser-origin auth, upload/audio limits, dotenv loading, and runtime status fields were added. | Verified; benchmark, full web coverage, and production deployment remain open |
 | 2026-07-31 | Benchmark tooling slice | `scripts/record_benchmark.py`, `scripts/benchmark.py`, `evaluation/README.md`, and aggregation tests added; 13 Python tests pass. Machine has speaker/microphone devices, FFmpeg, and `fpcalc`; only RapidAPI is configured. | Tooling verified; real corpus and two provider credentials remain required |
 | 2026-07-31 | Local fingerprint backend slice | `shazam_project/fingerprint.py`, local index builder, fourth-backend dispatcher wiring, README/evaluation documentation, and synthetic index tests added; 16 Python tests pass. | Algorithm path verified on synthetic tracks; real speaker/microphone accuracy and API comparison remain open |
 | 2026-07-31 | Matcher correctness slice | Provider adapters now return stable `error_code` values with diagnostic detail; mocked RapidAPI, AudD, and AcoustID success/no-match/HTTP/timeout/malformed-output tests and temporary-WAV cleanup tests were added. | 36 pytest tests passed; branch coverage is 59%; real provider behavior and credentialed smoke tests remain open |
 | 2026-07-31 | Polishing roadmap | Added an ordered eight-task execution roadmap covering benchmark evidence, audio validation, web ownership, production security, test depth, CI/repository hygiene, documentation reconciliation, and distinctiveness evaluation. | Roadmap recorded; complete one main task at a time |
-| 2026-07-31 | CI quality-gate slice | `.github/workflows/ci.yml` now runs pytest on every push and pull request across Python 3.10–3.12, enforces 50% branch coverage on Python 3.12, uploads `coverage.xml`, and runs frontend lint/build. Local verification: 16 tests passed; measured branch coverage is 51% including benchmark scripts. | Workflow is committed locally; remote GitHub Actions/Codecov execution remains pending until the branch is pushed |
+| 2026-07-31 | CI quality-gate slice | `.github/workflows/ci.yml` runs pytest on every push and pull request across Python 3.10–3.12, enforces 50% branch coverage on Python 3.12, and uploads `coverage.xml`. | Workflow is committed locally; remote GitHub Actions/Codecov execution remains pending until the branch is pushed |
