@@ -81,7 +81,7 @@ class CoreTests(unittest.TestCase):
             "artist": "Fallback Artist",
         }
 
-        clip = AudioClip(samples=np.zeros(100, dtype=np.float32), sample_rate=44100, source="test")
+        clip = AudioClip(samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test")
         cfg = AppConfig(
             audd_api_token="",
             acoustid_api_key="ACOUSTID",
@@ -106,19 +106,23 @@ class CoreTests(unittest.TestCase):
             "artist": "AudD Artist",
         }
 
-        clip = AudioClip(samples=np.zeros(100, dtype=np.float32), sample_rate=44100, source="test")
+        clip = AudioClip(samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test")
         cfg = AppConfig(audd_api_token="AUDD", acoustid_api_key="", rapidapi_key="RAPIDAPI")
 
         result = matcher.match_audio(clip, cfg)
 
         self.assertEqual(result["status"], "matched")
         self.assertEqual(result["backend"], "audd")
-        self.assertEqual([item["status"] for item in result["attempts"]], ["no_match", "matched"])
+        self.assertEqual(
+            [item["status"] for item in result["attempts"]],
+            ["no_match", "not_configured", "matched"],
+        )
 
     def test_dispatcher_reports_missing_backend(self):
-        clip = AudioClip(samples=np.zeros(10, dtype=np.float32), sample_rate=44100, source="test")
+        clip = AudioClip(samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test")
         result = matcher.match_audio(clip, AppConfig(audd_api_token=""))
-        self.assertEqual(result, {"status": "no_token", "attempts": []})
+        self.assertEqual(result["status"], "not_configured")
+        self.assertEqual({attempt["status"] for attempt in result["attempts"]}, {"not_configured"})
 
     @patch("shazam_project.matcher.match_audio_local")
     def test_dispatcher_includes_local_fingerprint_backend(self, mock_local):
@@ -127,7 +131,7 @@ class CoreTests(unittest.TestCase):
             "title": "Local Song",
             "artist": "Local Artist",
         }
-        clip = AudioClip(samples=np.zeros(10, dtype=np.float32), sample_rate=44100, source="test")
+        clip = AudioClip(samples=np.zeros(44100, dtype=np.float32), sample_rate=44100, source="test")
         cfg = AppConfig(audd_api_token="", fingerprint_index_path="index.json")
 
         result = matcher.match_audio(clip, cfg)

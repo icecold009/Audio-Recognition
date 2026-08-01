@@ -44,7 +44,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,12 +72,3 @@ jobs:
         with:
           name: coverage-python-3.12
           path: coverage.xml
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage.xml
-          # Coverage enforcement remains above; reporting must not fail CI when
-          # the renamed repository is not registered with Codecov yet.
-          fail_ci_if_error: false
-          use_oidc: true
