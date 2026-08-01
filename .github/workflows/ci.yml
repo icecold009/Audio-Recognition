@@ -78,5 +78,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           files: ./coverage.xml
-          fail_ci_if_error: true
+          # Coverage enforcement remains above; reporting must not fail CI when
+          # the renamed repository is not registered with Codecov yet.
+          fail_ci_if_error: false
           use_oidc: true
