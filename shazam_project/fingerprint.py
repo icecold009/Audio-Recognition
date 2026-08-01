@@ -201,7 +201,11 @@ def match_local_index(
     config = FingerprintConfig(**data["config"])
     query_hashes = fingerprint_audio(clip.samples, clip.sample_rate, config)
     if not query_hashes:
-        return {"status": "no_match", "error": "no fingerprint landmarks extracted"}
+        return {
+            "status": "no_match",
+            "result": None,
+            "error": "no fingerprint landmarks extracted",
+        }
 
     votes: Counter[tuple[str, int]] = Counter()
     matched_hashes: Counter[str] = Counter()

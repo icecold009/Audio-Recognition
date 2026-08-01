@@ -240,3 +240,7 @@ def test_local_fingerprint_index_matches_same_clip(tmp_path):
     assert result["title"] == "Test Song"
     assert "audio_path" not in result
     assert fingerprint_audio(clip.samples, clip.sample_rate)
+    empty_index = build_index([], tmp_path / "empty-index.json")
+    no_match = match_local_index(clip, empty_index)
+    assert no_match["status"] == "no_match"
+    assert no_match["result"] is None

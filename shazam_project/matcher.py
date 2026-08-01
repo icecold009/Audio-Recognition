@@ -138,7 +138,10 @@ def _public_response(response: dict[str, Any]) -> dict[str, Any]:
         "image", "score", "votes", "fingerprint_hashes", "matched_hashes",
         "offset_frames", "backend", "attempts",
     }
-    return {key: value for key, value in response.items() if key in allowed and value is not None}
+    public = {key: value for key, value in response.items() if key in allowed and value is not None}
+    if response.get("status") == "no_match":
+        public["result"] = None
+    return public
 
 
 def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:

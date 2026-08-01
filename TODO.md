@@ -37,12 +37,12 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 
 ### Main task 2 — Audio-pipeline validation
 
-- [ ] Decide and document that FFT is diagnostic or make it part of recognition; currently constellation hashing performs local recognition.
-- [ ] Make CLI and web audio-processing steps consistent, or document their intentional differences.
-- [ ] Validate empty audio, invalid sample rates, malformed WAV headers, unsupported encodings, and extreme durations.
-- [ ] Add mono/stereo, supported sample-width, unsupported 24-bit, malformed-header, and very-short-clip tests.
-- [ ] Decide whether non-WAV CLI input is supported and make the limitation consistent across CLI and web paths.
-- [ ] Tick Main task 2 only after validation behavior and tests are documented.
+- [x] Decide and document that FFT is diagnostic only; spectrogram peaks and constellation hash pairs perform local recognition.
+- [x] Document the shared CLI/web normalization contract and intentional CLI-WAV versus web-multi-format difference.
+- [x] Validate empty audio, invalid sample rates, malformed WAV headers, unsupported encodings, and extreme durations.
+- [x] Add mono/stereo, supported sample-width, unsupported 24-bit, malformed-header, and very-short-clip tests.
+- [x] Decide that non-WAV CLI input is unsupported while the web path converts documented formats through FFmpeg.
+- [x] Complete Main task 2 validation behavior and documentation with the Prompt 3 test evidence below.
 
 ### Main task 3 — Authoritative web application
 
@@ -50,7 +50,7 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 - [x] Retire the unused second browser implementation.
 - [x] Document `python web/app.py` as the canonical development command and describe the served UI and API.
 - [x] Ensure the README architecture diagram describes the actual Flask runtime path.
-- [ ] Tick Main task 3 only after a reviewer can identify and run the supported web path unambiguously.
+- [x] Tick Main task 3 after the reviewer can identify and run the supported web path unambiguously.
 
 ### Main task 4 — Production configuration and security
 
@@ -78,8 +78,9 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 ### Main task 6 — Dependency, CI, and repository hygiene
 
 - [x] Run pytest and coverage in GitHub Actions on every push and pull request.
-- [ ] Verify the workflow on the remote evaluation branch and confirm Codecov receives the report.
-- [ ] Verify Python tests in a clean supported environment.
+- [x] Verify the remote PR workflow: 65 tests pass and the 50% coverage gate passes.
+- [ ] Enable Codecov for this repository; the current upload reports `Repository not found`, so integration is deferred to CI hardening while `coverage.xml` remains an artifact.
+- [x] Verify Python tests in a clean supported environment.
 - [ ] Pin or constrain Python dependencies and add Python lint/static checks to CI.
 - [ ] Add dependency/security scanning and secret scanning.
 - [ ] Keep generated screenshots/test artifacts out of the source tree and remove stale or duplicate scaffold files.
@@ -92,7 +93,7 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 - [x] Reconcile README content with the actual Flask source tree.
 - [ ] Reconcile documented 8-second CLI, 5-second RapidAPI trim, and 10-second browser-recording behavior.
 - [ ] Document the exact source and command for each screenshot, and add failure-state screenshots where useful.
-- [ ] Remove unsupported platform claims and document API statuses, backend order, environment variables, and security boundaries.
+- [x] Remove unsupported platform claims and document API statuses, backend order, environment variables, and security boundaries.
 - [ ] Tick Main task 7 only after documentation describes shipped behavior rather than aspiration.
 
 ### Main task 8 — Distinctiveness and technical contribution
@@ -132,7 +133,7 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 
 ### Matcher correctness
 
-- [x] Define the backend fallback policy: distinguish provider error, transport failure, timeout, no-match, and missing configuration. The dispatcher falls through on `error`, `no_match`, and `no_token` and returns the final status otherwise.
+- [x] Define the backend fallback policy: distinguish provider error, transport failure, timeout, no-match, and missing configuration. The dispatcher falls through on `error`, `no_match`, and `not_configured` and returns the final status otherwise.
 - [x] Update `match_audio()` so configured fallback providers are attempted after eligible provider errors instead of returning immediately.
 - [x] Decide explicitly whether a provider `no_match` should trigger another provider. The current policy retries the next configured provider.
 - [x] Include the selected backend and fallback history in diagnostic output without exposing credentials.
@@ -145,13 +146,13 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 
 ### Audio pipeline correctness
 
-- [ ] Decide whether the FFT is a diagnostic visualization or part of recognition, and state that decision clearly.
-- [ ] If FFT remains diagnostic, explain that it does not identify the song and remove any implication that it is the fingerprinting algorithm.
+- [x] Decide that FFT is a diagnostic visualization only and state that decision clearly.
+- [x] Explain that FFT does not identify songs; local recognition uses spectrogram peaks and constellation hash pairs.
 - [ ] If FFT is intended to be part of recognition, implement and evaluate windowing, spectrogram/peak extraction, and a matching method.
 - [ ] Make the web path run the same documented analysis steps as the CLI, or document the intentional difference.
-- [ ] Add input validation for empty audio, invalid sample rates, malformed WAV files, unsupported encodings, and extreme durations.
-- [ ] Add tests for mono/stereo WAV, supported sample widths, unsupported 24-bit WAV, invalid headers, and very short clips.
-- [ ] Decide whether to support non-WAV CLI input; if not, make the limitation prominent and consistent with the web path.
+- [x] Add input validation for empty audio, invalid sample rates, malformed WAV files, unsupported encodings, and extreme durations.
+- [x] Add tests for mono/stereo WAV, supported sample widths, unsupported 24-bit WAV, invalid headers, and very short clips.
+- [x] Decide that non-WAV CLI input is unsupported and make the limitation prominent and consistent with the web path.
 - [x] Add explicit maximum upload size and maximum audio duration limits.
 - [x] Add a timeout and bounded resource handling around FFmpeg conversion.
 
@@ -173,11 +174,15 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 - [x] Make the Flask-served UI work when `INTERNAL_API_SECRET` is enabled, or remove that mode from the supported flow. Configured same-origin/allowlisted browser requests are accepted without exposing the secret.
 - [x] Configure optional cross-origin API access from an allowlist; same-origin browser access is the default.
 - [x] Add RapidAPI configuration to `/api/status`; report the actual active backend order.
-- [ ] Standardize response fields and statuses across all providers and the CLI/browser consumers.
-- [x] Correct the CLI `no_token` message so it identifies missing recognition configuration generically rather than naming AudD only.
+- [x] Standardize response fields and statuses across all providers and the CLI/browser consumers, including local `no_match` responses.
+- [x] Correct the CLI missing-configuration message so it identifies missing recognition configuration generically rather than naming AudD only.
 - [ ] Add a health/startup check that clearly reports missing provider, Supabase, FFmpeg, and `fpcalc` configuration.
 
 ### Rate limiting and production safety
+
+- [ ] Prompt 4 blocker: the Origin/Referer same-origin path can bypass `INTERNAL_API_SECRET`; the production trust model and secret boundary need a deliberate decision.
+- [ ] Prompt 4 blocker: Supabase quota reads and increments are non-atomic and can race under concurrent requests.
+- [ ] Prompt 4 blocker: Supabase failures fail open by returning zero usage and continuing recognition; production behavior must be fail-closed or visibly disable quota-protected recognition.
 
 - [ ] Make quota check and increment atomic so concurrent requests cannot bypass the limit.
 - [ ] Decide whether Supabase failure should fail closed or visibly disable recognition instead of silently returning zero usage.
@@ -199,7 +204,7 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 - [ ] Test rate-limit responses and quota accounting through the public route.
 - [ ] Add tests for `load_config()` and `missing_configuration()` including `.env`, missing keys, invalid `FP_CALC_PATH`, and provider combinations.
 - [ ] Add microphone tests using a mocked `sounddevice` implementation, including invalid duration, invalid sample rate, capture failure, and cleanup.
-- [x] Add coverage reporting with `coverage.py`, a 50% minimum threshold, an XML artifact, and a Codecov badge. The current measured branch-coverage baseline is 51% across `shazam_project`, `web`, and `scripts`.
+- [x] Add coverage reporting with `coverage.py`, a 50% minimum threshold, and a preserved `coverage.xml` artifact. Current measured branch coverage is 64% across `shazam_project`, `web`, and `scripts`; Codecov remains deferred because the repository is not found.
 
 ### Browser behavior quality
 
@@ -225,13 +230,13 @@ Complete these main tasks in order. A main task may be ticked only after its sub
 - [ ] Mark Supabase authentication, persistent user history, RLS-backed history, account deletion, settings, and protected routes as planned unless implemented.
 - [x] Reconcile the README with the actual Flask source tree.
 - [ ] Reconcile the documented 8-second CLI behavior, 5-second RapidAPI trim, and 10-second browser recording behavior.
-- [ ] Document that the current FFT is diagnostic and not used for matching, unless the implementation changes.
+- [x] Document that the current FFT is diagnostic and not used for matching.
 - [x] Replace the stale README “Add CI” roadmap entry with the implemented pytest, coverage, lint, and build gates.
 - [ ] Document the exact source and command used to generate each screenshot.
 - [ ] Add screenshots or recordings for no-match, provider error, permission denial, rate limiting, and upload failure states.
 - [x] Add a concise README Limitations section covering noise, catalog coverage, language/region differences, and live/cover/remix versions.
-- [ ] Remove unsupported “platforms tested” claims or attach reproducible platform evidence.
-- [ ] Document API status values, backend selection, required environment variables, and security boundaries from the implementation.
+- [x] Remove unsupported “platforms tested” claims and state that cross-platform support is not independently verified.
+- [x] Document API status values, backend selection, required environment variables, and security boundaries from the implementation.
 - [ ] Add a benchmark results section generated from the evaluation output rather than hand-entered numbers.
 
 ## P2 — distinctiveness and product value
@@ -263,10 +268,11 @@ Record evidence here as work lands:
 
 | Date | Task/check | Evidence | Result |
 |---|---|---|---|
+| 2026-08-01 | Prompt 3 cleanup | Flask status display restored RapidAPI and Supabase fields; local `no_match` now includes the shared `result: null` shape; README/TODO document the validated audio contract and Prompt 4 production blockers. | 65 tests passed; 64% total branch coverage; CI passed; `coverage.xml` artifact preserved; Codecov upload reported `Repository not found` and remains deferred |
 | 2026-07-31 | Initial repository review | `main` at `77d159f`; accuracy remains `X / Y`; Python execution was unavailable locally because the existing virtualenv points to an inaccessible interpreter. | Baseline recorded |
 | 2026-07-31 | P0/P1 web and matcher slice | `feature/evaluation-todo`; 10 Python unit/integration tests passed; dispatcher fallback, browser-origin auth, upload/audio limits, dotenv loading, and runtime status fields were added. | Verified; benchmark, full web coverage, and production deployment remain open |
 | 2026-07-31 | Benchmark tooling slice | `scripts/record_benchmark.py`, `scripts/benchmark.py`, `evaluation/README.md`, and aggregation tests added; 13 Python tests pass. Machine has speaker/microphone devices, FFmpeg, and `fpcalc`; only RapidAPI is configured. | Tooling verified; real corpus and two provider credentials remain required |
 | 2026-07-31 | Local fingerprint backend slice | `shazam_project/fingerprint.py`, local index builder, fourth-backend dispatcher wiring, README/evaluation documentation, and synthetic index tests added; 16 Python tests pass. | Algorithm path verified on synthetic tracks; real speaker/microphone accuracy and API comparison remain open |
 | 2026-07-31 | Matcher correctness slice | Provider adapters now return stable `error_code` values with diagnostic detail; mocked RapidAPI, AudD, and AcoustID success/no-match/HTTP/timeout/malformed-output tests and temporary-WAV cleanup tests were added. | 36 pytest tests passed; branch coverage is 59%; real provider behavior and credentialed smoke tests remain open |
 | 2026-07-31 | Polishing roadmap | Added an ordered eight-task execution roadmap covering benchmark evidence, audio validation, web ownership, production security, test depth, CI/repository hygiene, documentation reconciliation, and distinctiveness evaluation. | Roadmap recorded; complete one main task at a time |
-| 2026-07-31 | CI quality-gate slice | `.github/workflows/ci.yml` runs pytest on every push and pull request across Python 3.10–3.12, enforces 50% branch coverage on Python 3.12, and uploads `coverage.xml`. | Workflow is committed locally; remote GitHub Actions/Codecov execution remains pending until the branch is pushed |
+| 2026-07-31 | CI quality-gate slice | `.github/workflows/ci.yml` runs pytest on every push and pull request across Python 3.10–3.12, enforces 50% branch coverage on Python 3.12, and uploads `coverage.xml`. | Workflow structure verified; later PR #4 evidence supersedes the pending remote/Codecov note |
