@@ -28,6 +28,19 @@ class WebRouteTests(unittest.TestCase):
         web_app.supabase = None
         self.client = web_app.app.test_client()
 
+    def test_index_serves_the_flask_browser_application(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"DIY Shazam", response.data)
+        self.assertIn(b"/static/app.js", response.data)
+
+    def test_static_assets_are_served_by_flask(self):
+        response = self.client.get("/static/style.css")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"--color-bg", response.data)
+
     def test_status_reports_backend_and_runtime_configuration(self):
         cfg = AppConfig(audd_api_token="", acoustid_api_key="", rapidapi_key="RAPID")
         with patch.object(web_app, "load_config", return_value=cfg), patch.object(
@@ -56,12 +69,38 @@ class WebRouteTests(unittest.TestCase):
             response = self.client.post(
                 "/api/match",
                 data={"file": (BytesIO(_wav_bytes()), "sample.wav")},
-                headers={"Origin": "http://localhost:5173"},
+                headers={"Origin": "http://localhost"},
             )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), result)
         match_mock.assert_called_once()
+
+    def test_match_returns_no_match_using_the_shared_contract(self):
+        cfg = AppConfig(audd_api_token="TOKEN")
+        result = {"status": "no_match", "result": None}
+        with patch.object(web_app, "INTERNAL_API_SECRET", "server-only-secret"), patch.object(
+            web_app, "load_config", return_value=cfg
+        ), patch.object(web_app.matcher, "match_audio", return_value=result) as match_mock:
+            response = self.client.post(
+                "/api/match",
+                data={"file": (BytesIO(_wav_bytes()), "sample.wav")},
+                headers={"Origin": "http://localhost"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), result)
+        match_mock.assert_called_once()
+
+    def test_match_rejects_malformed_audio(self):
+        with patch.object(web_app, "INTERNAL_API_SECRET", ""):
+            response = self.client.post(
+                "/api/match",
+                data={"file": (BytesIO(b"not a wav file"), "sample.wav")},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["status"], "error")
 
     def test_match_rejects_unknown_origin_without_secret(self):
         with patch.object(web_app, "INTERNAL_API_SECRET", "server-only-secret"):
@@ -81,11 +120,23 @@ class WebRouteTests(unittest.TestCase):
             response = self.client.post(
                 "/api/match",
                 data={"file": (BytesIO(_wav_bytes()), "sample.wav")},
-                headers={"Origin": "http://localhost:5173"},
+                headers={"Origin": "http://localhost"},
             )
 
         self.assertEqual(response.status_code, 413)
         match_mock.assert_not_called()
+
+    def test_match_rejects_oversized_upload(self):
+        web_app.app.config["MAX_CONTENT_LENGTH"] = 32
+
+        with patch.object(web_app, "INTERNAL_API_SECRET", ""):
+            response = self.client.post(
+                "/api/match",
+                data={"file": (BytesIO(b"x" * 128), "sample.wav")},
+            )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(response.get_json()["status"], "error")
 
 
 if __name__ == "__main__":

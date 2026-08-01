@@ -10,6 +10,11 @@ from flask_cors import CORS
 from datetime import datetime, timezone
 from pathlib import Path
 
+if __package__ in {None, ""}:
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from flask import Flask, jsonify, render_template, request
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -23,7 +28,7 @@ load_dotenv()
 app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+    for origin in os.getenv("CORS_ORIGINS", "").split(",")
     if origin.strip()
 ]
 CORS(app, origins=CORS_ORIGINS)
@@ -301,4 +306,4 @@ def api_status():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    app.run(host="127.0.0.1", port=5000, debug=os.getenv("FLASK_DEBUG", "0") == "1")
