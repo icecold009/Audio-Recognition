@@ -269,8 +269,5 @@ avatars/
 
 | Variable | Used in | Purpose |
 |----------|---------|---------|
-| `VITE_SUPABASE_URL` | Frontend | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Frontend | Public anon key (safe to expose; RLS enforces security) |
-| `SUPABASE_URL` | Serverless functions | Same URL, server-side |
-| `SUPABASE_SERVICE_ROLE_KEY` | Serverless functions only | Admin operations (never expose to client) |
-
+| `SUPABASE_URL` | Flask server | Supabase project URL for optional usage counters |
+| `SUPABASE_KEY` | Flask server | Server-side key for optional usage counters |

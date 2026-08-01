@@ -15,6 +15,7 @@ class AppConfig:
     audio_seconds: int = 8
     fft_output_path: Path = Path("fft_output.png")
     rapidapi_key: str = ""
+    fingerprint_index_path: str | None = None
 
 
 def load_config(env_path: str | Path = ".env") -> AppConfig:
@@ -27,13 +28,21 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
         acoustid_api_key=os.getenv("ACOUSTID_API_KEY", "").strip(),
         fpcalc_path=os.getenv("FP_CALC_PATH", None),
         rapidapi_key=os.getenv("RAPIDAPI_KEY", "").strip(),
+        fingerprint_index_path=os.getenv("LOCAL_FINGERPRINT_INDEX", "").strip() or None,
     )
 
 
 def missing_configuration(config: AppConfig) -> list[str]:
     missing: list[str] = []
-    if not (config.audd_api_token or config.acoustid_api_key or config.rapidapi_key):
-        missing.append("AUDD_API_TOKEN or ACOUSTID_API_KEY or RAPIDAPI_KEY")
+    if not (
+        config.audd_api_token
+        or config.acoustid_api_key
+        or config.rapidapi_key
+        or config.fingerprint_index_path
+    ):
+        missing.append(
+            "AUDD_API_TOKEN or ACOUSTID_API_KEY or RAPIDAPI_KEY or LOCAL_FINGERPRINT_INDEX"
+        )
 
     if config.acoustid_api_key and config.fpcalc_path:
         try:

@@ -15,11 +15,21 @@ import numpy as np
 import requests
 
 from .config import AppConfig
+from .fingerprint import match_local_index
 from .recorder import AudioClip
 
 
 AUDD_ENDPOINT = "https://api.audd.io/"
 ACOUSTID_ENDPOINT = "https://api.acoustid.org/v2/lookup"
+
+
+def _error_response(error_code: str, detail: str) -> dict[str, Any]:
+    """Return the stable error shape shared by all provider adapters."""
+    return {
+        "status": "error",
+        "error_code": error_code,
+        "error": detail,
+    }
 
 
 def _write_clip_to_wav(clip: AudioClip, path: Path) -> None:
@@ -52,25 +62,8 @@ def _extract_audd_image(body: dict[str, Any]) -> str | None:
     return None
 
 
-def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
-    # Try Shazam (RapidAPI) first — most accurate
-    if config.rapidapi_key:
-        try:
-            return match_audio_shazam(clip, config, timeout=timeout)
-        except Exception:
-            pass
-
-    # Fall back to AcoustID
-    if config.acoustid_api_key:
-        try:
-            return match_audio_acoustid(clip, config, timeout=timeout)
-        except Exception:
-            pass
-
-    if not config.audd_api_token:
-        return {"status": "no_token"}
-
-    # write clip to temp file
+def _match_audio_audd(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
+    """Match a clip with AudD and return the shared result shape."""
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
     tmp.close()
     try:
@@ -84,9 +77,12 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
             files["file"].close()
 
         if resp.status_code != 200:
-            return {"status": "error", "error": f"HTTP {resp.status_code}"}
+            return _error_response("http_error", f"AudD HTTP {resp.status_code}")
 
-        body = resp.json()
+        try:
+            body = resp.json()
+        except (TypeError, ValueError) as exc:
+            return _error_response("malformed_response", f"AudD returned invalid JSON: {exc}")
         res = body.get("result")
         if not res:
             return {"status": "no_match", "result": None}
@@ -106,13 +102,75 @@ def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[s
             "image": image,
         }
 
+    except requests.Timeout as exc:
+        return _error_response("timeout", f"AudD request timed out: {exc}")
+    except requests.RequestException as exc:
+        return _error_response("request_error", f"AudD request failed: {exc}")
     except Exception as exc:
-        return {"status": "error", "error": str(exc)}
+        return _error_response("provider_error", f"AudD provider error: {exc}")
     finally:
         try:
             os.unlink(tmp.name)
         except Exception:
             pass
+
+
+def _attempt_summary(backend: str, response: dict[str, Any]) -> dict[str, Any]:
+    """Return safe diagnostics without copying provider payloads or secrets."""
+    summary = {
+        "backend": backend,
+        "status": response.get("status", "error"),
+    }
+    if response.get("error"):
+        summary["error"] = response["error"]
+    if response.get("error_code"):
+        summary["error_code"] = response["error_code"]
+    return summary
+
+
+def match_audio(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
+    """Try configured providers in order and fall back after errors or no-match.
+
+    Provider-specific functions keep their normalized response shape. This
+    dispatcher adds the selected backend and non-sensitive attempt summaries
+    so callers can explain which path produced the result.
+    """
+    providers: list[tuple[str, Any]] = []
+    if config.rapidapi_key:
+        providers.append(("rapidapi", match_audio_shazam))
+    if config.acoustid_api_key:
+        providers.append(("acoustid", match_audio_acoustid))
+    if config.audd_api_token:
+        providers.append(("audd", _match_audio_audd))
+    if config.fingerprint_index_path:
+        providers.append(("local", match_audio_local))
+
+    if not providers:
+        return {"status": "no_token", "attempts": []}
+
+    attempts: list[dict[str, Any]] = []
+    last_response: dict[str, Any] = {"status": "error", "error": "No provider response"}
+
+    for backend, provider in providers:
+        try:
+            response = dict(provider(clip, config, timeout=timeout))
+        except Exception as exc:  # defensive boundary for provider adapters
+            response = _error_response("provider_error", str(exc))
+
+        response["backend"] = backend
+        attempts.append(_attempt_summary(backend, response))
+        last_response = response
+
+        if response.get("status") == "matched":
+            response["attempts"] = attempts
+            return response
+
+        if response.get("status") not in {"error", "no_match", "no_token"}:
+            response["attempts"] = attempts
+            return response
+
+    last_response["attempts"] = attempts
+    return last_response
 
 
 def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
@@ -134,13 +192,16 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
 
         if not fpcalc_exe:
             logging.error("fpcalc not found; install Chromaprint or set FP_CALC_PATH in .env")
-            return {"status": "error", "error": "fpcalc not found; install Chromaprint or set FP_CALC_PATH in .env"}
+            return _error_response(
+                "configuration_error",
+                "fpcalc not found; install Chromaprint or set FP_CALC_PATH in .env",
+            )
 
         fpcalc_cmd = [fpcalc_exe, str(tmp.name)]
         proc = subprocess.run(fpcalc_cmd, capture_output=True, text=True, timeout=timeout)
         if proc.returncode != 0:
             logging.error("fpcalc failed: %s", proc.stderr.strip())
-            raise RuntimeError(f"fpcalc failed: {proc.stderr.strip()}")
+            return _error_response("fpcalc_error", f"fpcalc failed: {proc.stderr.strip()}")
 
         fingerprint = None
         duration = None
@@ -160,7 +221,7 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
 
         if not fingerprint or not duration:
             logging.error("Could not obtain fingerprint from fpcalc")
-            return {"status": "error", "error": "Could not obtain fingerprint from fpcalc"}
+            return _error_response("fpcalc_output_error", "Could not obtain fingerprint from fpcalc")
 
         params = {
             "client": config.acoustid_api_key,
@@ -173,9 +234,12 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
         resp = requests.get(ACOUSTID_ENDPOINT, params=params, timeout=timeout)
         if resp.status_code != 200:
             logging.error("AcoustID HTTP error: %s", resp.status_code)
-            return {"status": "error", "error": f"HTTP {resp.status_code}"}
+            return _error_response("http_error", f"AcoustID HTTP {resp.status_code}")
 
-        body = resp.json()
+        try:
+            body = resp.json()
+        except (TypeError, ValueError) as exc:
+            return _error_response("malformed_response", f"AcoustID returned invalid JSON: {exc}")
         results = body.get("results") or []
         if not results:
             logging.info("AcoustID returned no match")
@@ -208,8 +272,14 @@ def match_audio_acoustid(clip: AudioClip, config: AppConfig, timeout: int = 15) 
             "image": None,
         }
 
+    except subprocess.TimeoutExpired as exc:
+        return _error_response("timeout", f"AcoustID fingerprinting timed out: {exc}")
+    except requests.Timeout as exc:
+        return _error_response("timeout", f"AcoustID request timed out: {exc}")
+    except requests.RequestException as exc:
+        return _error_response("request_error", f"AcoustID request failed: {exc}")
     except Exception as exc:
-        return {"status": "error", "error": str(exc)}
+        return _error_response("provider_error", f"AcoustID provider error: {exc}")
     finally:
         try:
             os.unlink(tmp.name)
@@ -250,9 +320,12 @@ def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) ->
         )
 
         if resp.status_code != 200:
-            return {"status": "error", "error": f"HTTP {resp.status_code}"}
+            return _error_response("http_error", f"RapidAPI HTTP {resp.status_code}")
 
-        body = resp.json()
+        try:
+            body = resp.json()
+        except (TypeError, ValueError) as exc:
+            return _error_response("malformed_response", f"RapidAPI returned invalid JSON: {exc}")
 
         track = body.get("track")
         if not track:
@@ -279,10 +352,25 @@ def match_audio_shazam(clip: AudioClip, config: AppConfig, timeout: int = 15) ->
             "image": image,
         }
 
+    except requests.Timeout as exc:
+        return _error_response("timeout", f"RapidAPI request timed out: {exc}")
+    except requests.RequestException as exc:
+        return _error_response("request_error", f"RapidAPI request failed: {exc}")
     except Exception as exc:
-        return {"status": "error", "error": str(exc)}
+        return _error_response("provider_error", f"RapidAPI provider error: {exc}")
     finally:
         try:
             os.unlink(tmp.name)
         except Exception:
             pass
+
+
+def match_audio_local(clip: AudioClip, config: AppConfig, timeout: int = 15) -> dict[str, Any]:
+    """Match a clip against the local constellation-hash index."""
+    del timeout  # the local matcher is CPU-bound and does not make network calls
+    if not config.fingerprint_index_path:
+        return {"status": "no_token"}
+    try:
+        return match_local_index(clip, config.fingerprint_index_path)
+    except Exception as exc:
+        return _error_response("local_match_error", str(exc))

@@ -117,7 +117,7 @@ Users frequently encounter music in public spaces — cafes, stores, events — 
 ## Constraints
 
 - **API:** Shazam recognition via RapidAPI (free tier: 500 requests/month) — rate limiting required
-- **Hosting:** Free tier (Vercel / Netlify for frontend; Supabase free for backend)
+- **Hosting:** A Flask-capable host for the browser application and API; optional Supabase free tier for usage counters
 - **Browser support:** Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
 - **HTTPS required:** Microphone access requires secure context
 
@@ -132,4 +132,3 @@ Users frequently encounter music in public spaces — cafes, stores, events — 
 | Phase 3 | History management + detail view | Week 5 |
 | Phase 4 | Polish, error states, mobile QA | Week 6 |
 | Phase 5 | Deployment + security hardening | Week 7 |
-

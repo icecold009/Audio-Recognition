@@ -1,6 +1,7 @@
 <div align="center">
 
-[![CI](https://github.com/icecold009/Shazam-project/actions/workflows/ci.yml/badge.svg)](https://github.com/icecold009/Shazam-project/actions/workflows/ci.yml)
+[![CI](https://github.com/icecold009/audio-recognition/actions/workflows/ci.yml/badge.svg)](https://github.com/icecold009/audio-recognition/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/icecold009/audio-recognition/branch/main/graph/badge.svg)](https://codecov.io/gh/icecold009/audio-recognition)
 
 <br/>
 
@@ -17,34 +18,35 @@ FFT analysis · Multi-backend matching · Flask web UI · Terminal output
 </div>
 
 ## Overview
-DIY Shazam captures audio (mic or file), creates a frequency spectrum (FFT), and identifies tracks using one of several backends (RapidAPI/Shazam, AcoustID, AudD). A compact Flask web UI enables browser uploads.
+DIY Shazam captures audio (mic or file), creates a frequency spectrum (FFT), and identifies tracks using RapidAPI/Shazam, AcoustID, AudD, or a locally built constellation-hash fingerprint index. Flask serves the complete browser UI and JSON API from one origin.
 
 ## Performance
 
 | Metric | Result |
 |--------|--------|
-| Average recognition time (RapidAPI backend) | ~2.1 s |
-| Average recognition time (AudD backend) | ~3.4 s |
-| Test set accuracy | X / Y songs matched correctly |
+| Average recognition time (RapidAPI backend) | Not measured; real-world benchmark pending |
+| Average recognition time (AudD backend) | Not measured; real-world benchmark pending |
+| Test set accuracy | Not measured; real-world benchmark pending |
 | Sample audio length required | 8 s (configurable) |
-| Platforms tested | Windows 11, Ubuntu 22.04, macOS 14 |
+| Platforms tested | Not established by this branch's validation |
 
 ## Architecture
 ```mermaid
 flowchart LR
-  A[CLI / Web UI] --> B[Audio Input\n(mic or upload)]
+  A[CLI / Flask Browser UI] --> B[Audio Input\n(mic or upload)]
   B --> C[FFT Analysis\n(saves fft_output.png)]
   B --> D[Write WAV temp]
   D --> E{Matcher Backends}
   E -->|RapidAPI| F[Shazam]
   E -->|AcoustID| G[AcoustID]
   E -->|AudD| H[AudD]
-  F & G & H --> I[Normalized Result]
-  I --> J[Display (CLI) / JSON (Web)]
+  E -->|Local hashes| I[Local fingerprint index]
+  F & G & H & I --> J[Normalized Result]
+  J --> K[Display (CLI) / JSON (Web)]
   classDef blue fill:#ffffff,stroke:#1E90FF,stroke-width:2px,color:#1E90FF;
-  class A,B,C,D,E,F,G,H,I,J blue;
+  class A,B,C,D,E,F,G,H,I,J,K blue;
 ```
-Theme: black / white / blue — white nodes with a professional DodgerBlue accent (#1E90FF).
+Theme: black / white / blue — white nodes with a professional DodgerBlue accent (#1E90FF). The browser UI is served directly by Flask; there is no separate browser bundle.
 
 ## Quickstart
 1) Create & activate a venv:
@@ -61,11 +63,11 @@ pip install -r requirements.txt
 copy .env.example .env
 # edit .env to add AUDD_API_TOKEN or other keys
 ```
-4) Run CLI:
+4) Run CLI when terminal recognition is needed:
 ```powershell
 python main.py
 ```
-5) Run web UI (dev):
+5) Run the complete browser UI and API from Flask:
 ```powershell
 python web/app.py
 # open http://127.0.0.1:5000
@@ -83,20 +85,38 @@ Core source modules now live under `shazam_project/`:
 Entrypoints remain:
 
 - `main.py` (CLI)
-- `web/app.py` (Flask web app)
+- `web/app.py` (canonical Flask browser app and API)
+- `web/templates/index.html` and `web/static/` (same-origin browser assets)
 
 ## Configuration
-Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`, `ACOUSTID_API_KEY`, `FP_CALC_PATH`, `RAPIDAPI_KEY`. Matcher order: RapidAPI → AcoustID → AudD.
+Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`, `ACOUSTID_API_KEY`, `FP_CALC_PATH`, `RAPIDAPI_KEY`, and optional `LOCAL_FINGERPRINT_INDEX`. Matcher order: RapidAPI → AcoustID → AudD → local fingerprint index.
 
 ## Web UI
-`web/app.py` exposes `/api/match` for uploads and `/api/status` for tool/backend checks. Non-WAV uploads are converted with `ffmpeg` if present.
+`python web/app.py` serves `/`, `/static/*`, `/api/match`, and `/api/status` from the same origin. The browser supports microphone recording with a ten-second auto-stop, manual stop, waveform visualization, file upload, loading/error/no-match states, light/dark theme persistence, and session-only recognition history. Non-WAV uploads are converted with `ffmpeg` if present.
 
 ## Testing
-Run tests:
+Run the Python tests and coverage locally:
 ```powershell
-python -m unittest discover -v
+python -m pytest -q
+python -m coverage run --branch --source=shazam_project,web,scripts -m pytest -q
+python -m coverage report
 ```
-`tests/test_core.py` covers FFT image creation and a mocked AcoustID flow.
+`tests/` covers FFT image creation, mocked provider flows, dispatcher fallback, web routes, and synthetic local fingerprint index matching.
+
+GitHub Actions runs pytest on every push and pull request across Python 3.10, 3.11, and 3.12. A Python 3.12 coverage job enforces at least 50% total coverage across the Python packages and benchmark scripts, publishes `coverage.xml` as an artifact, and uploads it to Codecov.
+
+For the real-world comparison, see [`evaluation/README.md`](evaluation/README.md). It records speaker-to-microphone clips at 4, 8, and 15 seconds, builds the local landmark-hash index from clean source tracks, and compares the local backend against all three provider backends.
+
+## Limitations
+
+Recognition is not guaranteed outside the happy path. The main failure modes are:
+
+- **Background noise and recording quality:** speech, room echo, speaker distortion, very low volume, clipping, or music mixed with other sounds can hide the spectral peaks used by fingerprinting.
+- **Catalog coverage:** a provider can only return tracks in its database, while the local matcher can only identify tracks present in its local fingerprint index. A `no_match` result does not prove that the audio is invalid.
+- **Language and regional catalog differences:** the fingerprinting itself is not English-specific, but provider metadata and catalog coverage vary by language, region, release, and recording availability.
+- **Live, cover, remix, and alternate versions:** crowd noise, changed instrumentation, tempo or pitch, medleys, and different arrangements may fail to match or may be returned as the closest studio recording rather than the exact performance.
+
+The evaluation dataset is designed to measure these cases separately. Until that dataset is recorded and run through all configured backends, the README does not claim a general accuracy percentage.
 
 ## Notes & Tips
 - Record in a quiet space and keep the mic near the audio source.
@@ -105,7 +125,7 @@ python -m unittest discover -v
 
 ## Contributing
 Pull requests are welcome. For major changes, open an issue first.
-Run `python -m unittest discover -v` before submitting.
+Run `python -m pytest -q` and `python -m coverage report` before submitting.
 
 ***
 
@@ -127,7 +147,7 @@ FFT spectrum for a sample clip:
 
 ![FFT spectrum output](docs/screenshots/fft-output.png)
 
-![Web UI — song matched](docs/screenshots/web-ui.png)
+This image is diagnostic output from `shazam_project.fft_analyze.analyze_audio`; the canonical browser page is served by `python web/app.py` at `/`.
 
 ***
 
@@ -170,12 +190,12 @@ curl -X POST http://localhost:5000/api/match \
 
 ## Roadmap
 
-- [ ] Add CI — run `pytest` + lint on push
+- [x] Add CI — run pytest and coverage on every push and pull request
 - [ ] CLI flags: `--mode`, `--duration`, `--file` for unattended/scripted use
 - [ ] Local match history saved as JSON
 - [ ] `--no-open-image` flag for headless environments
 - [ ] Structured logging in `shazam_project/matcher.py` for easier debugging
-- [ ] End-to-end Flask test using the test client with a sample WAV
+- [x] Flask integration tests for the browser entry point, static assets, API status, and upload outcomes
 
 ***
 

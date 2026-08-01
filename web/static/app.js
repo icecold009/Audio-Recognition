@@ -369,11 +369,13 @@ async function refreshStatus() {
         const res = await fetch('/api/status');
         const s = await res.json();
         statusDiv.textContent =
+            `RapidAPI: ${s.rapidapi_configured ? 'configured' : 'not configured'}; ` +
             `AcoustID: ${s.acoustid_configured ? 'configured' : 'not configured'}; ` +
             `fpcalc on PATH: ${s.fpcalc_on_path ? 'yes' : 'no'}; ` +
             `FP_CALC_PATH exists: ${s.fpcalc_path_exists ? 'yes' : 'no'}; ` +
             `ffmpeg on PATH: ${s.ffmpeg_on_path ? 'yes' : 'no'}; ` +
             `AudD token: ${s.audd_configured ? 'configured' : 'not configured'}; ` +
+            `Supabase: ${s.supabase_configured ? 'configured' : 'not configured'}; ` +
             `Daily: ${s.daily_used}/${s.daily_limit}; ` +
             `Monthly: ${s.monthly_used}/${s.monthly_limit}; ` +
             `Cooldown: ${s.cooldown_seconds}s`;
@@ -428,7 +430,7 @@ function renderResult(data) {
         return;
     }
     if (data.status === 'no_token') {
-        resultDiv.innerText = 'Server: AUDD token not configured.';
+        resultDiv.innerText = 'Server: no recognition backend is configured.';
         renderRetryButton();
         return;
     }
