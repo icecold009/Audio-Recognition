@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import csv
+import sys
 from pathlib import Path
 
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from scripts.evaluation import load_source_manifest, resolve_manifest_path
 from shazam_project.fingerprint import build_index
 
 
@@ -22,16 +26,11 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    with args.sources.open(newline="", encoding="utf-8-sig") as handle:
-        rows = list(csv.DictReader(handle))
-    if not rows:
-        raise ValueError("The source manifest is empty")
+    rows = load_source_manifest(args.sources, require_audio=True)
 
     tracks: list[dict[str, str]] = []
     for row in rows:
-        audio_path = Path(row["source_audio_path"])
-        if not audio_path.is_absolute():
-            audio_path = (args.sources.parent / audio_path).resolve()
+        audio_path = resolve_manifest_path(args.sources, row["source_audio_path"]).resolve()
         tracks.append(
             {
                 "track_id": row.get("track_id") or row.get("source_id", ""),

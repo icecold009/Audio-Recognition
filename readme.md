@@ -22,13 +22,17 @@ DIY Shazam captures audio from the CLI microphone/file path or the Flask browser
 
 | Metric | Result |
 |--------|--------|
-| Average recognition time (RapidAPI backend) | Not measured; real-world benchmark pending |
-| Average recognition time (AudD backend) | Not measured; real-world benchmark pending |
-| Test set accuracy | Not measured; real-world benchmark pending |
+| Average recognition time (RapidAPI backend) | See the imported benchmark report below |
+| Average recognition time (AudD backend) | See the imported benchmark report below |
+| Test set accuracy | See the imported benchmark report below |
 | Minimum audio duration | 1 s by default (configurable) |
 | Maximum audio duration | 30 s by default (configurable) |
 | Maximum upload size | 10 MiB by default (configurable) |
 | Platforms tested | Not established by this branch's validation |
+
+<!-- BENCHMARK_RESULTS:START -->
+No complete real-world benchmark has been imported. Run the documented evaluation only after assembling a legally reusable corpus and supplying the operator metadata and provider configuration.
+<!-- BENCHMARK_RESULTS:END -->
 
 ## Architecture
 ```mermaid
@@ -184,7 +188,7 @@ GitHub Actions runs pytest on every push and pull request across Python 3.10, 3.
 
 Direct Python dependencies use reviewed major-compatible ranges in `requirements.txt` and `requirements-dev.txt`. To update one, review its release notes and Python 3.10–3.12 compatibility, edit its range, install from both requirement files, then run the full pytest, coverage, Ruff, compile, diff, and `pip-audit` checks. Do not add credentials or resolve updates from a developer's private environment.
 
-For the real-world comparison, see [`evaluation/README.md`](evaluation/README.md). It records speaker-to-microphone clips at 4, 8, and 15 seconds, builds the local landmark-hash index from clean source tracks, and compares the local backend against all three provider backends.
+For the real-world comparison, see [`evaluation/README.md`](evaluation/README.md). It validates a source catalog, records resumable speaker-to-microphone clips at 4, 8, and 15 seconds, caches deterministic backend results without credentials, builds the local landmark-hash index from clean source tracks, and compares the local backend against all three provider backends.
 
 ## Limitations
 
