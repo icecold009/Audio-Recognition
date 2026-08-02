@@ -155,6 +155,7 @@ def _public_response(response: dict[str, Any]) -> dict[str, Any]:
         "status",
         "error_code",
         "error",
+        "provider_id",
         "title",
         "artist",
         "album",

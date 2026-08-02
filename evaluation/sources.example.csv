@@ -1,4 +1,4 @@
-source_id,source_audio_path,title,artist,genre,era,condition
-track-001,C:\\path\\to\\source-001.wav,Replace with a real title,Replace with the artist,pop,2010s,speaker_mic_near
-track-002,C:\\path\\to\\source-002.wav,Replace with a real title,Replace with the artist,jazz,1990s,speaker_mic_room
-track-003,C:\\path\\to\\source-003.wav,Replace with a real title,Replace with the artist,classical,1980s,speaker_mic_noise
+source_id,source_audio_path,title,artist,genre,era,recording_condition,provenance_or_license_note,rapidapi_id,acoustid_id,audd_id,local_id
+track-001,C:\\path\\to\\source-001.wav,Replace with a real title,Replace with the artist,pop,2010s,speaker_mic_near,Document the owner/license and source URL,,,,
+track-002,C:\\path\\to\\source-002.wav,Replace with a real title,Replace with the artist,jazz,1990s,speaker_mic_room,Document the owner/license and source URL,,,,
+track-003,C:\\path\\to\\source-003.wav,Replace with a real title,Replace with the artist,classical,1980s,speaker_mic_noise,Document the owner/license and source URL,,,,
