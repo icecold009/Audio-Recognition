@@ -533,6 +533,8 @@ def test_validator_rejects_inconsistent_denominator_even_when_metadata_claims_co
         {
             "backend": backend,
             "clip_id": "track-001_4s",
+            "clip_length_s": 4.0,
+            "recording_condition": "room",
             "status": "matched",
             "correct": True,
         }
