@@ -204,6 +204,122 @@ def _production_quota_configured() -> bool:
     )
 
 
+def _fpcalc_available(config: AppConfig) -> bool:
+    fpcalc_available = bool(shutil.which("fpcalc"))
+    if config.fpcalc_path:
+        try:
+            fpcalc_available = fpcalc_available or Path(config.fpcalc_path).is_file()
+        except (OSError, TypeError, ValueError):
+            pass
+    return fpcalc_available
+
+
+def _recognition_backend_checks(config: AppConfig) -> dict[str, bool]:
+    """Return non-secret availability flags for the configured matchers."""
+    fpcalc_available = _fpcalc_available(config)
+    local_index_available = False
+    if config.fingerprint_index_path:
+        try:
+            local_index_available = Path(config.fingerprint_index_path).is_file()
+        except (OSError, TypeError, ValueError):
+            pass
+    return {
+        "rapidapi": bool(config.rapidapi_key),
+        "audd": bool(config.audd_api_token),
+        "acoustid": bool(config.acoustid_api_key and fpcalc_available),
+        "local": local_index_available,
+    }
+
+
+def _temporary_storage_ready() -> bool:
+    """Verify that the runtime temp area accepts a small bounded probe file."""
+    try:
+        with tempfile.NamedTemporaryFile(prefix="audio-recognition-ready-", delete=True) as probe:
+            probe.write(b"ok")
+            probe.flush()
+        return True
+    except (OSError, ValueError):
+        logging.error(
+            "readiness_failure operation=temp_storage error_code=temp_storage_unavailable"
+        )
+        return False
+
+
+def _production_quota_ready() -> bool:
+    """Probe the non-consuming service-role quota RPC without exposing client data."""
+    if not _production_quota_configured():
+        return False
+    probe_hash = hmac.new(
+        CLIENT_ID_HMAC_SECRET.encode("utf-8"),
+        b"audio-recognition-readiness-probe",
+        hashlib.sha256,
+    ).hexdigest()
+    try:
+        response = supabase.rpc(
+            "check_api_quota",
+            {
+                "p_client_id_hash": probe_hash,
+                "p_daily_limit": DAILY_LIMIT,
+                "p_monthly_limit": MONTHLY_LIMIT,
+                "p_cooldown_seconds": COOLDOWN_SECONDS,
+                "p_now": _utc_now().isoformat(),
+            },
+        ).execute()
+        data = response.data
+        if isinstance(data, list):
+            data = data[0] if data else None
+        return isinstance(data, dict) and isinstance(data.get("allowed"), bool)
+    except Exception:
+        _log_supabase_failure("readiness_quota", "quota_readiness_failed")
+        return False
+
+
+def _readiness_report() -> dict:
+    """Build a safe readiness report without returning paths or exception text."""
+    try:
+        config = load_config()
+        backend_checks = _recognition_backend_checks(config)
+        production_required = APP_ENV != "development"
+        checks = {
+            "production_configuration": {
+                "ok": not production_required or _production_quota_configured(),
+                "required": production_required,
+            },
+            "writable_temp_storage": {"ok": _temporary_storage_ready(), "required": True},
+            "ffmpeg": {"ok": bool(shutil.which("ffmpeg")), "required": True},
+            "fpcalc": {
+                "ok": not bool(config.acoustid_api_key) or _fpcalc_available(config),
+                "required": bool(config.acoustid_api_key),
+            },
+            "supabase_quota": {
+                "ok": not production_required or _production_quota_ready(),
+                "required": production_required,
+            },
+            "recognition_backend": {
+                "ok": any(backend_checks.values()),
+                "required": True,
+                "backends": backend_checks,
+            },
+        }
+    except Exception:
+        _log_supabase_failure("readiness_configuration", "configuration_check_failed")
+        checks = {
+            "production_configuration": {"ok": False, "required": True},
+            "writable_temp_storage": {"ok": False, "required": True},
+            "ffmpeg": {"ok": False, "required": True},
+            "fpcalc": {"ok": False, "required": False},
+            "supabase_quota": {"ok": False, "required": True},
+            "recognition_backend": {"ok": False, "required": True, "backends": {}},
+        }
+    ready = all(check["ok"] for check in checks.values())
+    return {
+        "status": "ready" if ready else "not_ready",
+        "ready": ready,
+        "quota_mode": _quota_mode(),
+        "checks": checks,
+    }
+
+
 def _quota_mode() -> str:
     if APP_ENV == "development":
         return "development-memory"
@@ -411,6 +527,20 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/healthz", methods=["GET"])
+def healthz():
+    return jsonify({"status": "ok"})
+
+
+@app.route("/readyz", methods=["GET"])
+def readyz():
+    report = _readiness_report()
+    if not report["ready"]:
+        report["error_code"] = "not_ready"
+        return jsonify(report), 503
+    return jsonify(report)
+
+
 @app.route("/api/match", methods=["POST"])
 def api_match():
     if INTERNAL_API_SECRET and request.headers.get("X-API-Secret") != INTERNAL_API_SECRET:
@@ -486,6 +616,7 @@ def api_status():
         "rapidapi_configured": bool(config.rapidapi_key),
         "acoustid_configured": bool(config.acoustid_api_key),
         "audd_configured": bool(config.audd_api_token),
+        "recognition_backends": _recognition_backend_checks(config),
         "local_index_configured": bool(config.fingerprint_index_path),
         "fpcalc_on_path": bool(shutil.which("fpcalc")),
         "fpcalc_path_exists": fpcalc_path_exists,
@@ -514,6 +645,6 @@ def api_status():
 if __name__ == "__main__":
     app.run(
         host="127.0.0.1",
-        port=5000,
+        port=max(1, min(65535, _int_env("PORT", 5000))),
         debug=APP_ENV == "development" and os.getenv("FLASK_DEBUG", "0") == "1",
     )
