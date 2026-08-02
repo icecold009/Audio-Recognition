@@ -243,10 +243,16 @@ def test_relative_manifest_path_rejects_unrepresentable_cross_drive_path(monkeyp
 
 
 def test_local_benchmark_uses_stable_identifier_and_preserves_it_in_cache(monkeypatch, tmp_path):
-    clips = {
-        name: _wav(tmp_path / name)
-        for name in ("correct.wav", "false-positive.wav", "fallback.wav")
-    }
+    clips = {}
+    for index, name in enumerate(("correct.wav", "false-positive.wav", "fallback.wav"), start=1):
+        path = tmp_path / name
+        sf.write(
+            path,
+            np.full(12_000, index / 100, dtype=np.float32),
+            8_000,
+            subtype="PCM_16",
+        )
+        clips[name] = path
     manifest = _write_clip_manifest(
         tmp_path,
         [
