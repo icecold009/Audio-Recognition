@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import csv
 from pathlib import Path
 from types import SimpleNamespace
@@ -727,6 +728,63 @@ def test_aggregate_reports_rates_conditions_and_percentiles():
     assert summary["by_recording_condition"]["near"]["accuracy_numerator"] == 1
 
 
+def _complete_results() -> dict:
+    records = []
+    lengths_and_conditions = ((4.0, "room"), (8.0, "near"), (15.0, "noise"))
+    for source_number in range(1, 31):
+        source_id = f"source-{source_number:02d}"
+        for clip_length, condition in lengths_and_conditions:
+            for backend in benchmark.BACKENDS:
+                records.append(
+                    {
+                        "backend": backend,
+                        "source_id": source_id,
+                        "clip_id": f"{source_id}_{clip_length:g}s",
+                        "clip_length_s": clip_length,
+                        "recording_condition": condition,
+                        "status": "matched",
+                        "correct": True,
+                        "identity_method": "provider_identifier",
+                        "provider_id": f"{backend}-{source_id}",
+                        "returned_title": "Synthetic Song",
+                        "returned_artist": "Synthetic Artist",
+                        "latency_ms": 10.0 + source_number,
+                    }
+                )
+    return {
+        "schema_version": 2,
+        "metadata": {
+            "complete": True,
+            "generated_at_utc": "2026-01-01T00:00:00+00:00",
+            "python_version": "3.12",
+            "os": "test",
+            "network_region": "EU",
+            "provider_plan": "reviewed-plan",
+            "timeout_seconds": 15,
+            "cache_state": "cold",
+            "cache_hits": 0,
+            "cache_misses": 360,
+            "missing_clip_count": 0,
+            "selected_backends": list(benchmark.BACKENDS),
+            "incomplete_reasons": [],
+        },
+        "clip_count": 90,
+        "backend_summary": {
+            backend: benchmark._aggregate(records, backend) for backend in benchmark.BACKENDS
+        },
+        "records": records,
+    }
+
+
+def _replace_records(results: dict, records: list[dict], clip_count: int) -> dict:
+    results["records"] = records
+    results["clip_count"] = clip_count
+    results["backend_summary"] = {
+        backend: benchmark._aggregate(records, backend) for backend in benchmark.BACKENDS
+    }
+    return results
+
+
 def test_readme_update_refuses_incomplete_results_without_writing(tmp_path):
     readme = tmp_path / "readme.md"
     original = "before\n<!-- BENCHMARK_RESULTS:START -->\nold\n<!-- BENCHMARK_RESULTS:END -->\n"
@@ -752,36 +810,8 @@ def test_validator_checks_counts_even_when_metadata_claims_complete():
 
 
 def test_validator_rejects_inconsistent_denominator_even_when_metadata_claims_complete():
-    records = [
-        {
-            "backend": backend,
-            "clip_id": "track-001_4s",
-            "clip_length_s": 4.0,
-            "recording_condition": "room",
-            "status": "matched",
-            "correct": True,
-        }
-        for backend in benchmark.BACKENDS
-    ]
-    summaries = {
-        backend: {
-            **benchmark._aggregate(records, backend),
-            "accuracy_denominator": 0,
-        }
-        for backend in benchmark.BACKENDS
-    }
-    results = {
-        "metadata": {
-            "complete": True,
-            "incomplete_reasons": [],
-            "network_region": "EU",
-            "provider_plan": "reviewed-plan",
-            "selected_backends": list(benchmark.BACKENDS),
-        },
-        "clip_count": 1,
-        "backend_summary": summaries,
-        "records": records,
-    }
+    results = _complete_results()
+    results["backend_summary"]["rapidapi"]["accuracy_denominator"] = 0
 
     with pytest.raises(ValueError, match="accuracy denominator is inconsistent"):
         validate_complete_results(results)
@@ -793,38 +823,7 @@ def test_readme_update_imports_only_generated_complete_metrics(tmp_path):
         "before\n<!-- BENCHMARK_RESULTS:START -->\nold\n<!-- BENCHMARK_RESULTS:END -->\n",
         encoding="utf-8",
     )
-    records = [
-        {
-            "backend": backend,
-            "source_id": "track-001",
-            "clip_id": "track-001_4s",
-            "clip_length_s": 4.0,
-            "recording_condition": "room",
-            "status": "matched",
-            "correct": True,
-            "latency_ms": 10.0,
-        }
-        for backend in benchmark.BACKENDS
-    ]
-    results = {
-        "metadata": {
-            "complete": True,
-            "generated_at_utc": "2026-01-01T00:00:00+00:00",
-            "python_version": "3.12",
-            "os": "test",
-            "network_region": "EU",
-            "provider_plan": "reviewed-plan",
-            "timeout_seconds": 15,
-            "cache_state": "cold",
-            "selected_backends": list(benchmark.BACKENDS),
-            "incomplete_reasons": [],
-        },
-        "clip_count": 1,
-        "backend_summary": {
-            backend: benchmark._aggregate(records, backend) for backend in benchmark.BACKENDS
-        },
-        "records": records,
-    }
+    results = _complete_results()
 
     update_readme(readme, results)
 
@@ -832,6 +831,95 @@ def test_readme_update_imports_only_generated_complete_metrics(tmp_path):
     assert "Benchmark results" in updated
     assert "reviewed-plan" in updated
     assert "\nold\n" not in updated
+
+
+@pytest.mark.parametrize(
+    "shape",
+    ["one_clip", "missing_length", "duplicate_pair", "few_conditions"],
+)
+def test_readme_import_refuses_incomplete_corpus_shapes(tmp_path, shape):
+    results = copy.deepcopy(_complete_results())
+    if shape == "one_clip":
+        records = [
+            record
+            for record in results["records"]
+            if record["source_id"] == "source-01" and record["clip_length_s"] == 4.0
+        ]
+        _replace_records(results, records, 1)
+    elif shape == "missing_length":
+        records = [
+            record
+            for record in results["records"]
+            if not (record["source_id"] == "source-01" and record["clip_length_s"] == 15.0)
+        ]
+        _replace_records(results, records, 89)
+    elif shape == "duplicate_pair":
+        for record in results["records"]:
+            if record["source_id"] == "source-02" and record["clip_length_s"] == 4.0:
+                record["source_id"] = "source-01"
+        _replace_records(results, results["records"], 90)
+    else:
+        for record in results["records"]:
+            record["recording_condition"] = "room"
+        _replace_records(results, results["records"], 90)
+
+    readme = tmp_path / f"{shape}.md"
+    original = "before\n<!-- BENCHMARK_RESULTS:START -->\nold\n<!-- BENCHMARK_RESULTS:END -->\n"
+    readme.write_text(original, encoding="utf-8")
+    with pytest.raises(ValueError, match="incomplete"):
+        update_readme(readme, results)
+    assert readme.read_text(encoding="utf-8") == original
+
+
+def test_readme_import_refuses_malformed_audio_even_with_complete_shape(tmp_path):
+    results = copy.deepcopy(_complete_results())
+    target = results["records"][0]
+    target.update(
+        {
+            "status": "invalid_audio",
+            "error_code": "malformed_wav",
+            "correct": False,
+            "failure_reason": "benchmark input could not be decoded",
+        }
+    )
+    _replace_records(results, results["records"], 90)
+
+    readme = tmp_path / "malformed.md"
+    readme.write_text(
+        "before\n<!-- BENCHMARK_RESULTS:START -->\nold\n<!-- BENCHMARK_RESULTS:END -->\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="unusable audio"):
+        update_readme(readme, results)
+
+
+@pytest.mark.parametrize("mutation", ["accuracy", "error_rate", "latency", "breakdown", "failures"])
+def test_readme_import_refuses_altered_derived_summary_values(tmp_path, mutation):
+    results = copy.deepcopy(_complete_results())
+    summary = results["backend_summary"]["rapidapi"]
+    if mutation == "accuracy":
+        summary["accuracy"] = 0.5
+    elif mutation == "error_rate":
+        summary["provider_error_rate"] = 0.5
+    elif mutation == "latency":
+        summary["latency_ms"]["mean"] = 999.0
+    elif mutation == "breakdown":
+        summary["by_clip_length"]["4.0"]["accuracy"] = 0.5
+    else:
+        summary["failures"] = [{"clip_id": "fabricated"}]
+
+    readme = tmp_path / f"{mutation}.md"
+    readme.write_text(
+        "before\n<!-- BENCHMARK_RESULTS:START -->\nold\n<!-- BENCHMARK_RESULTS:END -->\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="summary does not match records"):
+        update_readme(readme, results)
+
+
+def test_synthetic_complete_corpus_passes_readme_import_gate(tmp_path):
+    results = _complete_results()
+    validate_complete_results(results)
 
 
 def test_report_generation_contains_metadata_and_metrics(tmp_path):

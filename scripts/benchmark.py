@@ -33,6 +33,9 @@ BACKEND_VERSIONS = {
     "local": "matcher-local-v1",
 }
 CACHE_SCHEMA_VERSION = 1
+EXPECTED_SOURCE_COUNT = 30
+EXPECTED_CLIP_LENGTHS = frozenset({4.0, 8.0, 15.0})
+EXPECTED_CLIPS_PER_BACKEND = EXPECTED_SOURCE_COUNT * len(EXPECTED_CLIP_LENGTHS)
 SAFE_RESULT_FIELDS = {
     "status",
     "error_code",
@@ -382,6 +385,47 @@ def _aggregate(records: list[dict[str, Any]], backend: str) -> dict[str, Any]:
     return summary
 
 
+def _corpus_shape_reasons(records: list[dict[str, Any]], selected_backends: list[str]) -> list[str]:
+    reasons: list[str] = []
+    for backend in selected_backends:
+        backend_records = [record for record in records if record.get("backend") == backend]
+        if len(backend_records) != EXPECTED_CLIPS_PER_BACKEND:
+            reasons.append(
+                f"{backend} must contain exactly {EXPECTED_CLIPS_PER_BACKEND} clip records"
+            )
+
+        source_ids = {record.get("source_id") for record in backend_records}
+        if len(source_ids) != EXPECTED_SOURCE_COUNT or any(
+            not isinstance(source_id, str) or not source_id for source_id in source_ids
+        ):
+            reasons.append(
+                f"{backend} must contain exactly {EXPECTED_SOURCE_COUNT} distinct source IDs"
+            )
+
+        source_lengths: dict[str, list[Any]] = {}
+        pairs: list[tuple[Any, Any]] = []
+        for record in backend_records:
+            source_id = record.get("source_id")
+            length = record.get("clip_length_s")
+            pairs.append((source_id, length))
+            source_lengths.setdefault(source_id, []).append(length)
+        if len(set(pairs)) != len(pairs):
+            reasons.append(f"{backend} contains duplicate source/clip-length pairs")
+        if any(set(lengths) != EXPECTED_CLIP_LENGTHS for lengths in source_lengths.values()):
+            reasons.append(
+                f"{backend} must contain one 4-second, one 8-second, and one 15-second clip per source"
+            )
+
+        conditions = {
+            record.get("recording_condition")
+            for record in backend_records
+            if record.get("recording_condition")
+        }
+        if len(conditions) < 3:
+            reasons.append(f"{backend} must contain at least three recording conditions")
+    return reasons
+
+
 def _hardware_summary() -> dict[str, str]:
     return {
         "system": platform.system(),
@@ -396,18 +440,24 @@ def _safe_operator_value(value: str) -> str:
 
 
 def _incomplete_reasons(
-    selected_backends: list[str], summaries: dict[str, dict[str, Any]], clip_count: int
+    selected_backends: list[str],
+    summaries: dict[str, dict[str, Any]],
+    clip_count: int,
+    records: list[dict[str, Any]],
 ) -> list[str]:
     reasons = []
     if clip_count == 0:
         reasons.append("the clip manifest contains no clips")
     if set(selected_backends) != set(BACKENDS):
         reasons.append("all four backends were not selected")
+    reasons.extend(_corpus_shape_reasons(records, selected_backends))
     for backend in selected_backends:
         if summaries[backend]["not_configured"]:
             reasons.append(f"{backend} credentials or local index are incomplete")
         if summaries[backend]["missing_inputs"]:
             reasons.append(f"{backend} has missing or unusable clips")
+        if summaries[backend]["unusable_inputs"]:
+            reasons.append(f"{backend} has unusable audio inputs")
         expected_records = (
             summaries[backend]["attempted"]
             + summaries[backend]["missing_inputs"]
@@ -542,7 +592,7 @@ def run(
                 _write_cache(cache_dir, key, backend, checksum, config, timeout, result)
 
     summaries = {backend: _aggregate(records, backend) for backend in selected_backends}
-    reasons = _incomplete_reasons(selected_backends, summaries, len(rows))
+    reasons = _incomplete_reasons(selected_backends, summaries, len(rows), records)
     cache_state = _cache_state(cache_hits, cache_misses)
     missing_clip_ids = {
         record["clip_id"] for record in records if record.get("error_code") == "missing_clip"

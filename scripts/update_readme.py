@@ -9,7 +9,7 @@ from typing import Any
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.benchmark import BACKENDS, _group_summary, render_markdown
+from scripts.benchmark import BACKENDS, _aggregate, _corpus_shape_reasons, render_markdown
 
 START_MARKER = "<!-- BENCHMARK_RESULTS:START -->"
 END_MARKER = "<!-- BENCHMARK_RESULTS:END -->"
@@ -52,6 +52,11 @@ def validate_complete_results(results: dict[str, Any]) -> None:
         not isinstance(record, dict) for record in records
     ):
         raise ValueError("Benchmark results are incomplete: record count is inconsistent.")
+    corpus_reasons = _corpus_shape_reasons(records, list(BACKENDS))
+    if corpus_reasons:
+        raise ValueError("Benchmark results are incomplete: " + "; ".join(corpus_reasons) + ".")
+    if any(record.get("status") == "invalid_audio" for record in records):
+        raise ValueError("Benchmark results are incomplete: unusable audio inputs are present.")
 
     expected_clip_ids: set[str] | None = None
     for backend in BACKENDS:
@@ -114,20 +119,12 @@ def validate_complete_results(results: dict[str, Any]) -> None:
                 f"Benchmark results are incomplete for {backend}; accuracy counts are inconsistent."
             )
         try:
-            calculated = _group_summary(backend_records)
+            calculated = _aggregate(records, backend)
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError(
                 f"Benchmark results are incomplete for {backend}; records are invalid."
             ) from exc
-        calculated_fields = (
-            "attempted",
-            "correct",
-            "missing_inputs",
-            "not_configured",
-            "accuracy_numerator",
-            "accuracy_denominator",
-        )
-        if any(summary[field] != calculated[field] for field in calculated_fields):
+        if summary != calculated:
             raise ValueError(
                 f"Benchmark results are incomplete for {backend}; summary does not match records."
             )
