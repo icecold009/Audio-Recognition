@@ -133,6 +133,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  render-blueprint-schema:
+    name: Validate Render Blueprint schema
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install schema validator
+        run: python -m pip install --upgrade pip "check-jsonschema>=0.33,<1"
+
+      - name: Download current Render Blueprint schema
+        run: curl --fail --silent --show-error https://render.com/schema/render.yaml.json --output /tmp/render.yaml.json
+
+      - name: Validate Render Blueprint with current Render schema
+        run: check-jsonschema --schemafile /tmp/render.yaml.json render.yaml
+
   container-smoke:
     name: Container build and smoke test
     runs-on: ubuntu-latest
@@ -145,17 +168,28 @@ jobs:
       - name: Build production image
         run: docker build --tag audio-recognition-ci .
 
-      - name: Run non-root container and smoke test
+      - name: Run production image and smoke test from outside the containers
         shell: bash
         run: |
           set -euo pipefail
-          container_id="$(docker run --detach --read-only \
+          production_container_id="$(docker run --detach --read-only \
             --tmpfs /tmp:rw,noexec,nosuid,size=64m \
             --publish 127.0.0.1:5000:5000 \
-            --env APP_ENV=development \
+            --env APP_ENV=production \
             --env PORT=5000 \
             audio-recognition-ci)"
-          trap 'docker logs "$container_id"; docker rm --force "$container_id"' EXIT
+          mocked_container_id=""
+          cleanup() {
+            if [ -n "$production_container_id" ]; then
+              docker logs "$production_container_id" || true
+              docker rm --force "$production_container_id" || true
+            fi
+            if [ -n "$mocked_container_id" ]; then
+              docker logs "$mocked_container_id" || true
+              docker rm --force "$mocked_container_id" || true
+            fi
+          }
+          trap cleanup EXIT
 
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:5000/healthz; then
@@ -168,14 +202,64 @@ jobs:
             sleep 1
           done
 
-          test "$(docker inspect --format '{{.Config.User}}' "$container_id")" = "10001:10001"
-          docker exec "$container_id" sh -c 'command -v ffmpeg && command -v fpcalc && gunicorn --version'
+          test "$(docker inspect --format '{{.Config.User}}' "$production_container_id")" = "10001:10001"
+          docker exec "$production_container_id" sh -c 'command -v ffmpeg && command -v fpcalc && gunicorn --version'
           curl --fail --silent http://127.0.0.1:5000/
           curl --fail --silent http://127.0.0.1:5000/healthz
           test "$(curl --silent --output /tmp/ready.json --write-out '%{http_code}' http://127.0.0.1:5000/readyz)" = "503"
-          curl --fail --silent http://127.0.0.1:5000/api/status
+          grep -Eq '"status"[[:space:]]*:[[:space:]]*"not_ready"' /tmp/ready.json
+          grep -Eq '"production_configuration"[[:space:]]*:[[:space:]]*\{[[:space:]]*"ok"[[:space:]]*:[[:space:]]*false' /tmp/ready.json
+          test "$(curl --silent --output /tmp/status.json --write-out '%{http_code}' http://127.0.0.1:5000/api/status)" = "503"
+          grep -Eq '"status"[[:space:]]*:[[:space:]]*"error"' /tmp/status.json
+          grep -Eq '"quota_mode"[[:space:]]*:[[:space:]]*"unavailable"' /tmp/status.json
+          grep -Eq '"error_code"[[:space:]]*:[[:space:]]*"quota_unavailable"' /tmp/status.json
+
+          mocked_container_id="$(docker run --detach --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --volume "$GITHUB_WORKSPACE/.github/container_smoke_wsgi.py:/tmp/container_smoke_wsgi.py:ro" \
+            --publish 127.0.0.1:5001:5000 \
+            --env APP_ENV=development \
+            --env PORT=5000 \
+            --env PYTHONPATH=/tmp \
+            audio-recognition-ci \
+            gunicorn --config gunicorn.conf.py --bind 0.0.0.0:5000 container_smoke_wsgi:app)"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5001/healthz; then
+              break
+            fi
+            if [ "$attempt" = "30" ]; then
+              echo "Mocked recognition container did not become healthy" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
           printf 'not a wav file' > /tmp/invalid.wav
           test "$(curl --silent --output /tmp/invalid.json --write-out '%{http_code}' \
             -F 'file=@/tmp/invalid.wav;filename=invalid.wav' \
-            http://127.0.0.1:5000/api/match)" = "400"
+            http://127.0.0.1:5001/api/match)" = "400"
           grep -q 'invalid_audio' /tmp/invalid.json
+
+          python3 - <<'PY'
+          import math
+          import struct
+          import wave
+
+          sample_rate = 8000
+          frame_count = int(1.25 * sample_rate)
+          frames = b"".join(
+              struct.pack("<h", int(0.25 * 32767 * math.sin(2 * math.pi * 440 * i / sample_rate)))
+              for i in range(frame_count)
+          )
+          with wave.open("/tmp/smoke.wav", "wb") as wav_file:
+              wav_file.setnchannels(1)
+              wav_file.setsampwidth(2)
+              wav_file.setframerate(sample_rate)
+              wav_file.writeframes(frames)
+          PY
+          curl --fail --silent \
+            -F 'file=@/tmp/smoke.wav;filename=smoke.wav' \
+            http://127.0.0.1:5001/api/match > /tmp/matched.json
+          grep -Eq '"status"[[:space:]]*:[[:space:]]*"matched"' /tmp/matched.json
+          grep -q 'CI Smoke Song' /tmp/matched.json
+          grep -q 'container-smoke' /tmp/matched.json

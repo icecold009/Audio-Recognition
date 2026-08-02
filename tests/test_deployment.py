@@ -144,7 +144,7 @@ def test_status_is_non_secret_and_reports_runtime_contract(monkeypatch):
     assert "SUPABASE_SERVICE_ROLE_KEY" not in response.get_data(as_text=True)
 
 
-def test_external_flask_smoke_covers_invalid_upload_and_mocked_match(monkeypatch):
+def test_in_process_flask_smoke_covers_invalid_upload_and_mocked_match(monkeypatch):
     _reset_runtime(monkeypatch)
     client = web_app.app.test_client()
     monkeypatch.setattr(
@@ -183,11 +183,16 @@ def test_deployment_manifests_define_non_root_runtime_and_smoke_contract():
     assert "libchromaprint-tools" in dockerfile
     assert "USER 10001:10001" in dockerfile
     assert "gunicorn" in dockerfile
-    assert "healthz" in dockerfile
+    assert "HEALTHCHECK" in dockerfile
+    assert "http://127.0.0.1:${PORT}/healthz" in dockerfile
+    assert "/readyz" not in dockerfile
     assert "--read-only" not in dockerfile
     assert "read_only: true" in compose
     assert "/tmp:size=64m" in compose
-    assert "healthCheckPath: /healthz" in render
+    assert "healthCheckPath: /readyz" in render
+    assert "healthCheckPath: /healthz" not in render
+    assert "http://127.0.0.1:$${PORT}/healthz" in compose
+    assert "/readyz" not in compose
     assert "sync: false" in render
     assert ".env" in ignore
     assert "coverage.xml" in ignore

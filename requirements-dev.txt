@@ -1,4 +1,5 @@
 coverage>=7.6,<8
+check-jsonschema>=0.33,<1
 pip-audit>=2.7,<3
 pytest>=9.0.3,<10
 ruff>=0.9,<1
