@@ -309,7 +309,7 @@ def test_local_benchmark_uses_stable_identifier_and_preserves_it_in_cache(monkey
     monkeypatch.setattr(
         benchmark,
         "load_config",
-        lambda _path: AppConfig(fingerprint_index_path=str(index)),
+        lambda _path: AppConfig(audd_api_token="", fingerprint_index_path=str(index)),
     )
     monkeypatch.setitem(
         benchmark.BACKENDS,
