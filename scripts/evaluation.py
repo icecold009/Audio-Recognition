@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import os
 import re
 from pathlib import Path
 
@@ -177,6 +178,14 @@ def relative_manifest_path(manifest_path: str | Path, value: str | Path) -> str:
     manifest_parent = Path(manifest_path).parent.resolve()
     path = Path(value).resolve()
     try:
-        return path.relative_to(manifest_parent).as_posix()
-    except ValueError:
-        return path.name
+        relative = os.path.relpath(path, manifest_parent)
+    except ValueError as exc:
+        raise ManifestValidationError(
+            "The clip output path must be on the same drive as the manifest "
+            "to be stored as a portable relative path."
+        ) from exc
+    if os.path.isabs(relative):
+        raise ManifestValidationError(
+            "The clip output path could not be represented as a portable relative path."
+        )
+    return Path(relative).as_posix()

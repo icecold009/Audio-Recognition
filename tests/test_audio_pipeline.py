@@ -235,6 +235,7 @@ def test_local_provider_diagnostics_do_not_expose_index_paths():
     cfg = config(fingerprint_index_path="C:\\private\\fingerprints\\index.json")
     local_result = {
         "status": "matched",
+        "provider_id": "track-1",
         "result": {"audio_path": "C:\\private\\catalog\\track.wav"},
         "title": "Local Song",
     }
@@ -243,6 +244,7 @@ def test_local_provider_diagnostics_do_not_expose_index_paths():
         response = matcher.match_audio_local(clip, cfg)
 
     assert response["status"] == "matched"
+    assert response["provider_id"] == "track-1"
     assert "result" not in response
     assert "C:\\private" not in str(response)
 
@@ -320,6 +322,7 @@ def test_local_fingerprint_index_matches_same_clip(tmp_path):
     clip = load_audio_file(source)
     result = match_local_index(clip, index)
     assert result["status"] == "matched"
+    assert result["provider_id"] == "track-1"
     assert result["title"] == "Test Song"
     assert "audio_path" not in result
     assert fingerprint_audio(clip.samples, clip.sample_rate)

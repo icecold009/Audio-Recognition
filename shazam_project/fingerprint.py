@@ -244,6 +244,7 @@ def match_local_index(
     confidence = vote_count / max(1, len(query_hashes))
     return {
         "status": "matched",
+        "provider_id": str(track_id),
         "result": track,
         "title": track.get("title", ""),
         "artist": track.get("artist", ""),

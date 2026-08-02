@@ -269,12 +269,8 @@ def main() -> int:
         for current_source in sources:
             for length in CLIP_LENGTHS:
                 clip = _clip_path(args.output_dir, current_source["source_id"], length)
-                clip_id = f"{current_source['source_id']}_{length}s"
                 if _verified_clip(clip, length):
-                    ordered_rows.append(
-                        existing.get(clip_id)
-                        or _clip_row(current_source, clip, length, args.manifest)
-                    )
+                    ordered_rows.append(_clip_row(current_source, clip, length, args.manifest))
         _write_manifest(args.manifest, ordered_rows)
 
     print(f"Verified {len(_load_existing_rows(args.manifest))} clips in the benchmark manifest.")

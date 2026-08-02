@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from scripts import benchmark, record_benchmark
-from scripts.evaluation import ManifestValidationError, load_source_manifest
+from scripts import benchmark, evaluation, record_benchmark
+from scripts.evaluation import ManifestValidationError, load_clip_manifest, load_source_manifest
 from scripts.update_readme import update_readme, validate_complete_results
 from shazam_project.config import AppConfig
 
@@ -134,6 +134,223 @@ def test_recording_resume_preserves_verified_clip(monkeypatch, tmp_path):
 
     assert existing.read_bytes() == before
     assert (output_dir / "track-001_8s.wav").is_file()
+
+
+def test_recording_resume_rebuilds_verified_rows_from_current_source_metadata(
+    monkeypatch, tmp_path
+):
+    output_dir = tmp_path / "clips"
+    output_dir.mkdir()
+    source_audio = _wav(tmp_path / "source.wav", seconds=15)
+    clip_bytes = {}
+    for length in record_benchmark.CLIP_LENGTHS:
+        clip = _wav(output_dir / f"track-001_{length}s.wav", seconds=length)
+        clip_bytes[length] = clip.read_bytes()
+
+    sources = tmp_path / "sources.csv"
+    source_row = {
+        "source_id": "track-001",
+        "source_audio_path": source_audio.name,
+        "title": "Current Song",
+        "artist": "Current Artist",
+        "genre": "jazz",
+        "era": "2020s",
+        "recording_condition": "near",
+        "provenance_or_license_note": "Current provenance",
+        "local_id": "current-local-id",
+    }
+    with sources.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(source_row))
+        writer.writeheader()
+        writer.writerow(source_row)
+
+    manifest = tmp_path / "manifest.csv"
+    stale_rows = [
+        {
+            "source_id": "track-001",
+            "clip_id": f"track-001_{length}s",
+            "audio_path": f"clips/track-001_{length}s.wav",
+            "expected_title": "Old Song",
+            "expected_artist": "Old Artist",
+            "genre": "rock",
+            "era": "1990s",
+            "recording_condition": "room",
+            "provenance_or_license_note": "Old provenance",
+            "clip_length_s": str(length),
+            "local_id": "old-local-id",
+        }
+        for length in record_benchmark.CLIP_LENGTHS
+    ]
+    _write_clip_manifest(tmp_path, stale_rows)
+
+    monkeypatch.setattr(record_benchmark, "sd", SimpleNamespace())
+    monkeypatch.setattr(
+        record_benchmark.sys,
+        "argv",
+        [
+            "record_benchmark.py",
+            "--sources",
+            str(sources),
+            "--output-dir",
+            str(output_dir),
+            "--manifest",
+            str(manifest),
+            "--input-device",
+            "1",
+            "--output-device",
+            "2",
+            "--yes",
+        ],
+    )
+
+    assert record_benchmark.main() == 0
+
+    rows = load_clip_manifest(manifest)
+    assert len(rows) == len(record_benchmark.CLIP_LENGTHS)
+    assert {row["expected_title"] for row in rows} == {"Current Song"}
+    assert {row["expected_artist"] for row in rows} == {"Current Artist"}
+    assert {row["genre"] for row in rows} == {"jazz"}
+    assert {row["era"] for row in rows} == {"2020s"}
+    assert {row["recording_condition"] for row in rows} == {"near"}
+    assert {row["provenance_or_license_note"] for row in rows} == {"Current provenance"}
+    assert {row["local_id"] for row in rows} == {"current-local-id"}
+    for length in record_benchmark.CLIP_LENGTHS:
+        assert (output_dir / f"track-001_{length}s.wav").read_bytes() == clip_bytes[length]
+
+
+def test_relative_manifest_path_supports_nested_and_outside_output_layouts(tmp_path):
+    manifest = tmp_path / "evaluation" / "manifest.csv"
+    nested = tmp_path / "evaluation" / "clips" / "nested" / "track.wav"
+    sibling = tmp_path / "recordings" / "track.wav"
+
+    assert (
+        evaluation.relative_manifest_path(manifest, tmp_path / "evaluation" / "clips" / "track.wav")
+        == "clips/track.wav"
+    )
+    assert evaluation.relative_manifest_path(manifest, nested) == "clips/nested/track.wav"
+    assert evaluation.relative_manifest_path(manifest, sibling) == "../recordings/track.wav"
+
+
+def test_relative_manifest_path_rejects_unrepresentable_cross_drive_path(monkeypatch, tmp_path):
+    def incompatible_drives(*_args):
+        raise ValueError("path is on another drive")
+
+    monkeypatch.setattr(evaluation.os.path, "relpath", incompatible_drives)
+    with pytest.raises(ManifestValidationError, match="same drive"):
+        evaluation.relative_manifest_path(
+            tmp_path / "manifest.csv", tmp_path / "clips" / "track.wav"
+        )
+
+
+def test_local_benchmark_uses_stable_identifier_and_preserves_it_in_cache(monkeypatch, tmp_path):
+    clips = {
+        name: _wav(tmp_path / name)
+        for name in ("correct.wav", "false-positive.wav", "fallback.wav")
+    }
+    manifest = _write_clip_manifest(
+        tmp_path,
+        [
+            {
+                "source_id": "correct-source",
+                "clip_id": "correct-source_4s",
+                "audio_path": clips["correct.wav"].name,
+                "expected_title": "Correct Song",
+                "expected_artist": "Correct Artist",
+                "genre": "pop",
+                "era": "2020s",
+                "recording_condition": "room",
+                "clip_length_s": "4",
+                "local_id": "local-correct",
+            },
+            {
+                "source_id": "false-source",
+                "clip_id": "false-source_4s",
+                "audio_path": clips["false-positive.wav"].name,
+                "expected_title": "False Positive Song",
+                "expected_artist": "False Positive Artist",
+                "genre": "pop",
+                "era": "2020s",
+                "recording_condition": "room",
+                "clip_length_s": "4",
+                "local_id": "local-expected",
+            },
+            {
+                "source_id": "fallback-source",
+                "clip_id": "fallback-source_4s",
+                "audio_path": clips["fallback.wav"].name,
+                "expected_title": "Fallback Song",
+                "expected_artist": "Fallback Artist",
+                "genre": "pop",
+                "era": "2020s",
+                "recording_condition": "room",
+                "clip_length_s": "4",
+            },
+        ],
+    )
+    index = tmp_path / "fingerprint-index.json"
+    index.write_text("{}", encoding="utf-8")
+    calls = 0
+
+    def fake_local(clip, _config, timeout):
+        nonlocal calls
+        calls += 1
+        assert timeout == 15
+        result = {
+            "correct.wav": {"provider_id": "local-correct", "title": "Wrong", "artist": "Wrong"},
+            "false-positive.wav": {
+                "provider_id": "local-other",
+                "title": "False Positive Song",
+                "artist": "False Positive Artist",
+            },
+            "fallback.wav": {"title": "Fallback Song", "artist": "Fallback Artist"},
+        }[clip.path.name]
+        return {"status": "matched", **result}
+
+    monkeypatch.setattr(
+        benchmark,
+        "load_config",
+        lambda _path: AppConfig(fingerprint_index_path=str(index)),
+    )
+    monkeypatch.setitem(
+        benchmark.BACKENDS,
+        "local",
+        ("Local constellation-hash", fake_local, "fingerprint_index_path"),
+    )
+
+    first = benchmark.run(
+        manifest,
+        tmp_path / "first.json",
+        15,
+        tmp_path / ".env",
+        backends=["local"],
+        cache_dir=tmp_path / "cache",
+    )
+    second = benchmark.run(
+        manifest,
+        tmp_path / "second.json",
+        15,
+        tmp_path / ".env",
+        backends=["local"],
+        cache_dir=tmp_path / "cache",
+    )
+
+    first_summary = first["backend_summary"]["local"]
+    second_summary = second["backend_summary"]["local"]
+    assert calls == 3
+    assert first_summary["correct"] == 2
+    assert first_summary["false_positives"] == 1
+    assert first["records"][0]["identity_method"] == "provider_identifier"
+    assert first["records"][1]["correct"] is False
+    assert first["records"][1]["provider_id"] == "local-other"
+    assert first["records"][2]["identity_method"] == "normalized_title_artist"
+    assert first["metadata"]["cache_state"] == "cold"
+    assert second["metadata"]["cache_state"] == "warm"
+    assert second_summary["accuracy"] == first_summary["accuracy"]
+    assert [record["provider_id"] for record in second["records"]] == [
+        "local-correct",
+        "local-other",
+        "",
+    ]
 
 
 def test_benchmark_cache_is_deterministic_and_does_not_store_credentials(monkeypatch, tmp_path):

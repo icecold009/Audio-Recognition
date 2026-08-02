@@ -9,7 +9,7 @@ from typing import Any
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.benchmark import BACKENDS, render_markdown
+from scripts.benchmark import BACKENDS, _group_summary, render_markdown
 
 START_MARKER = "<!-- BENCHMARK_RESULTS:START -->"
 END_MARKER = "<!-- BENCHMARK_RESULTS:END -->"
@@ -112,6 +112,24 @@ def validate_complete_results(results: dict[str, Any]) -> None:
         if summary["correct"] > summary["attempted"]:
             raise ValueError(
                 f"Benchmark results are incomplete for {backend}; accuracy counts are inconsistent."
+            )
+        try:
+            calculated = _group_summary(backend_records)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Benchmark results are incomplete for {backend}; records are invalid."
+            ) from exc
+        calculated_fields = (
+            "attempted",
+            "correct",
+            "missing_inputs",
+            "not_configured",
+            "accuracy_numerator",
+            "accuracy_denominator",
+        )
+        if any(summary[field] != calculated[field] for field in calculated_fields):
+            raise ValueError(
+                f"Benchmark results are incomplete for {backend}; summary does not match records."
             )
 
 
