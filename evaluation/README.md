@@ -119,7 +119,7 @@ Run all four backends only after credentials and quotas are intentionally config
 
 Bash uses the same arguments with `.venv/bin/python` and backslashes for line continuation. Provider calls are paid/external operations; do not run this command until the corpus, credentials, plan, and quota budget have been reviewed.
 
-The JSON and Markdown outputs include top-1 numerator/denominator and accuracy, breakdowns by clip length and recording condition, no-match, false-positive, provider-error, timeout, and unusable-input rates, mean/median/p95 latency, stable identifier method, UTC date, OS, Python version, hardware summary, operator network region, provider plan, timeout, and cold/warm cache state. Accuracy denominators are attempted clips; `not_configured` is reported separately and never treated as a zero score.
+The JSON and Markdown outputs include top-1 numerator/denominator and accuracy, breakdowns by clip length and recording condition, no-match, false-positive, provider-error, timeout, and unusable-input rates, mean/median/p95 latency, stable identifier method, UTC date, OS, Python version, hardware summary, operator network region, provider plan, timeout, and `cold`, `warm`, `mixed`, or `empty` cache state. Accuracy denominators are attempted clips; missing clips are reported as missing inputs and excluded, while `not_configured` is reported separately and never treated as a zero score. Cache-hit latency measures the local cache read, not provider recognition time; a mixed report can therefore contain both cache-read and provider-call latency.
 
 ## 5. Import only complete results into the README
 

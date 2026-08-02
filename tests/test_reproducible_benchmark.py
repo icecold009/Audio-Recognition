@@ -49,8 +49,16 @@ def _sources_csv(path: Path, *, complete: bool = True, duplicate: bool = False) 
     return csv_path
 
 
-def _clip_manifest(path: Path, clip: Path, *, provider_id: str = "") -> Path:
+def _write_clip_manifest(path: Path, rows: list[dict[str, str]]) -> Path:
     manifest = path / "manifest.csv"
+    with manifest.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return manifest
+
+
+def _clip_manifest(path: Path, clip: Path, *, provider_id: str = "") -> Path:
     row = {
         "source_id": "track-001",
         "clip_id": "track-001_4s",
@@ -64,11 +72,7 @@ def _clip_manifest(path: Path, clip: Path, *, provider_id: str = "") -> Path:
     }
     if provider_id:
         row["rapidapi_id"] = provider_id
-    with manifest.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(row))
-        writer.writeheader()
-        writer.writerow(row)
-    return manifest
+    return _write_clip_manifest(path, [row])
 
 
 def test_source_manifest_requires_all_provenance_fields_and_existing_audio(tmp_path):
@@ -186,6 +190,14 @@ def test_benchmark_cache_is_deterministic_and_does_not_store_credentials(monkeyp
     assert "Authorization" not in cache_text
 
 
+@pytest.mark.parametrize(
+    ("hits", "misses", "expected"),
+    [(0, 0, "empty"), (0, 2, "cold"), (2, 0, "warm"), (2, 1, "mixed")],
+)
+def test_cache_state_distinguishes_empty_cold_warm_and_mixed(hits, misses, expected):
+    assert benchmark._cache_state(hits, misses) == expected
+
+
 def test_refresh_cache_calls_backend_again(monkeypatch, tmp_path):
     clip = _wav(tmp_path / "clip.wav")
     manifest = _clip_manifest(tmp_path, clip)
@@ -244,6 +256,173 @@ def test_incomplete_credentials_never_call_backend_or_claim_complete(monkeypatch
     assert results["metadata"]["complete"] is False
     assert results["records"][0]["status"] == "not_configured"
     assert not (tmp_path / "cache").exists()
+
+
+def _configured_rapidapi(monkeypatch, provider):
+    monkeypatch.setattr(
+        benchmark,
+        "load_config",
+        lambda _path: AppConfig(audd_api_token="", rapidapi_key="key"),
+    )
+    monkeypatch.setitem(
+        benchmark.BACKENDS,
+        "rapidapi",
+        ("RapidAPI/Shazam", provider, "rapidapi_key"),
+    )
+
+
+def test_one_missing_clip_is_visible_and_excluded_from_accuracy(monkeypatch, tmp_path):
+    manifest = _write_clip_manifest(
+        tmp_path,
+        [
+            {
+                "source_id": "track-001",
+                "clip_id": "track-001_4s",
+                "audio_path": "missing.wav",
+                "expected_title": "Example Song",
+                "expected_artist": "Example Artist",
+                "genre": "pop",
+                "era": "2010s",
+                "recording_condition": "room",
+                "clip_length_s": "4",
+            }
+        ],
+    )
+    called = False
+
+    def forbidden_provider(*_args, **_kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("missing clips must not call providers")
+
+    _configured_rapidapi(monkeypatch, forbidden_provider)
+    results = benchmark.run(
+        manifest,
+        tmp_path / "result.json",
+        15,
+        tmp_path / ".env",
+        backends=["rapidapi"],
+        cache_dir=tmp_path / "cache",
+    )
+
+    summary = results["backend_summary"]["rapidapi"]
+    assert called is False
+    assert results["metadata"]["complete"] is False
+    assert results["metadata"]["missing_clip_count"] == 1
+    assert results["metadata"]["cache_state"] == "empty"
+    assert summary["total_clips"] == 1
+    assert summary["attempted"] == 0
+    assert summary["accuracy_denominator"] == 0
+    assert summary["missing_inputs"] == 1
+    assert results["records"][0]["error_code"] == "missing_clip"
+    assert results["records"][0]["status"] == "invalid_audio"
+    readme = tmp_path / "readme.md"
+    readme.write_text(
+        "before\n<!-- BENCHMARK_RESULTS:START -->\nold\n<!-- BENCHMARK_RESULTS:END -->\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="incomplete"):
+        update_readme(readme, results)
+    assert "old" in readme.read_text(encoding="utf-8")
+
+
+def test_all_missing_clips_mark_benchmark_incomplete_without_cache_operations(
+    monkeypatch, tmp_path
+):
+    rows = []
+    for length in ("4", "8"):
+        rows.append(
+            {
+                "source_id": "track-001",
+                "clip_id": f"track-001_{length}s",
+                "audio_path": f"missing-{length}.wav",
+                "expected_title": "Example Song",
+                "expected_artist": "Example Artist",
+                "genre": "pop",
+                "era": "2010s",
+                "recording_condition": "room",
+                "clip_length_s": length,
+            }
+        )
+    manifest = _write_clip_manifest(tmp_path, rows)
+    _configured_rapidapi(monkeypatch, lambda *_args, **_kwargs: {"status": "matched"})
+
+    results = benchmark.run(
+        manifest,
+        tmp_path / "result.json",
+        15,
+        tmp_path / ".env",
+        backends=["rapidapi"],
+        cache_dir=tmp_path / "cache",
+    )
+
+    summary = results["backend_summary"]["rapidapi"]
+    assert results["metadata"]["complete"] is False
+    assert results["metadata"]["missing_clip_count"] == 2
+    assert results["metadata"]["cache_state"] == "empty"
+    assert summary["attempted"] == 0
+    assert summary["accuracy_denominator"] == 0
+    assert summary["missing_inputs"] == 2
+    assert not (tmp_path / "cache").exists()
+
+
+def test_mixed_present_and_missing_clips_excludes_only_missing_clip_from_denominator(
+    monkeypatch, tmp_path
+):
+    present = _wav(tmp_path / "present.wav")
+    manifest = _write_clip_manifest(
+        tmp_path,
+        [
+            {
+                "source_id": "track-001",
+                "clip_id": "track-001_4s",
+                "audio_path": present.name,
+                "expected_title": "Example Song",
+                "expected_artist": "Example Artist",
+                "genre": "pop",
+                "era": "2010s",
+                "recording_condition": "room",
+                "clip_length_s": "4",
+            },
+            {
+                "source_id": "track-001",
+                "clip_id": "track-001_8s",
+                "audio_path": "missing.wav",
+                "expected_title": "Example Song",
+                "expected_artist": "Example Artist",
+                "genre": "pop",
+                "era": "2010s",
+                "recording_condition": "room",
+                "clip_length_s": "8",
+            },
+        ],
+    )
+    _configured_rapidapi(
+        monkeypatch,
+        lambda *_args, **_kwargs: {
+            "status": "matched",
+            "title": "Example Song",
+            "artist": "Example Artist",
+        },
+    )
+
+    results = benchmark.run(
+        manifest,
+        tmp_path / "result.json",
+        15,
+        tmp_path / ".env",
+        backends=["rapidapi"],
+        cache_dir=tmp_path / "cache",
+    )
+
+    summary = results["backend_summary"]["rapidapi"]
+    assert results["metadata"]["complete"] is False
+    assert summary["total_clips"] == 2
+    assert summary["attempted"] == 1
+    assert summary["correct"] == 1
+    assert summary["accuracy_denominator"] == 1
+    assert summary["missing_inputs"] == 1
+    assert results["metadata"]["cache_state"] == "cold"
 
 
 def test_stable_identifier_wins_and_title_artist_is_explicit_fallback(monkeypatch, tmp_path):
@@ -337,6 +516,52 @@ def test_readme_update_refuses_incomplete_results_without_writing(tmp_path):
     assert readme.read_text(encoding="utf-8") == original
 
 
+def test_validator_checks_counts_even_when_metadata_claims_complete():
+    results = {
+        "metadata": {"complete": True, "incomplete_reasons": []},
+        "clip_count": 0,
+        "backend_summary": {backend: {} for backend in benchmark.BACKENDS},
+        "records": [],
+    }
+
+    with pytest.raises(ValueError, match="clip_count must be greater than zero"):
+        validate_complete_results(results)
+
+
+def test_validator_rejects_inconsistent_denominator_even_when_metadata_claims_complete():
+    records = [
+        {
+            "backend": backend,
+            "clip_id": "track-001_4s",
+            "status": "matched",
+            "correct": True,
+        }
+        for backend in benchmark.BACKENDS
+    ]
+    summaries = {
+        backend: {
+            **benchmark._aggregate(records, backend),
+            "accuracy_denominator": 0,
+        }
+        for backend in benchmark.BACKENDS
+    }
+    results = {
+        "metadata": {
+            "complete": True,
+            "incomplete_reasons": [],
+            "network_region": "EU",
+            "provider_plan": "reviewed-plan",
+            "selected_backends": list(benchmark.BACKENDS),
+        },
+        "clip_count": 1,
+        "backend_summary": summaries,
+        "records": records,
+    }
+
+    with pytest.raises(ValueError, match="accuracy denominator is inconsistent"):
+        validate_complete_results(results)
+
+
 def test_readme_update_imports_only_generated_complete_metrics(tmp_path):
     readme = tmp_path / "readme.md"
     readme.write_text(
@@ -347,7 +572,7 @@ def test_readme_update_imports_only_generated_complete_metrics(tmp_path):
         {
             "backend": backend,
             "source_id": "track-001",
-            "clip_id": f"track-001_{backend}",
+            "clip_id": "track-001_4s",
             "clip_length_s": 4.0,
             "recording_condition": "room",
             "status": "matched",
@@ -366,11 +591,14 @@ def test_readme_update_imports_only_generated_complete_metrics(tmp_path):
             "provider_plan": "reviewed-plan",
             "timeout_seconds": 15,
             "cache_state": "cold",
+            "selected_backends": list(benchmark.BACKENDS),
+            "incomplete_reasons": [],
         },
         "clip_count": 1,
         "backend_summary": {
             backend: benchmark._aggregate(records, backend) for backend in benchmark.BACKENDS
         },
+        "records": records,
     }
 
     update_readme(readme, results)
@@ -399,3 +627,41 @@ def test_report_generation_contains_metadata_and_metrics(tmp_path):
     assert "P95 ms" in report
     assert "speaker_mic_room" in report
     assert results["metadata"]["network_region"] == "EU"
+
+
+def test_render_markdown_has_one_section_per_backend_and_breakdown(tmp_path):
+    records = []
+    for backend in benchmark.BACKENDS:
+        for clip_length, condition in ((4.0, "near"), (8.0, "room")):
+            records.append(
+                {
+                    "backend": backend,
+                    "source_id": "track-001",
+                    "clip_id": f"track-001_{backend}_{clip_length:g}s",
+                    "clip_length_s": clip_length,
+                    "recording_condition": condition,
+                    "status": "matched",
+                    "correct": True,
+                    "latency_ms": 10.0,
+                }
+            )
+    results = {
+        "metadata": {
+            "generated_at_utc": "2026-01-01T00:00:00+00:00",
+            "python_version": "3.12",
+            "os": "test",
+            "network_region": "EU",
+            "provider_plan": "test-plan",
+            "timeout_seconds": 15,
+            "cache_state": "cold",
+        },
+        "backend_summary": {
+            backend: benchmark._aggregate(records, backend) for backend in benchmark.BACKENDS
+        },
+    }
+
+    report = benchmark.render_markdown(results)
+
+    for backend in benchmark.BACKENDS:
+        assert report.count(f"## {backend} by clip length") == 1
+        assert report.count(f"## {backend} by recording condition") == 1

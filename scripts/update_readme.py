@@ -18,24 +18,100 @@ END_MARKER = "<!-- BENCHMARK_RESULTS:END -->"
 def validate_complete_results(results: dict[str, Any]) -> None:
     metadata = results.get("metadata")
     summaries = results.get("backend_summary")
+    records = results.get("records")
     clip_count = results.get("clip_count")
     if (
         not isinstance(metadata, dict)
         or not isinstance(summaries, dict)
-        or not isinstance(clip_count, int)
+        or type(clip_count) is not int
+        or not isinstance(records, list)
     ):
         raise ValueError("Benchmark results are incomplete: required sections are missing.")
-    if not metadata.get("complete"):
-        raise ValueError("Benchmark results are incomplete; README was not changed.")
+    if clip_count <= 0:
+        raise ValueError("Benchmark results are incomplete: clip_count must be greater than zero.")
     if not metadata.get("network_region") or not metadata.get("provider_plan"):
         raise ValueError("Benchmark results are incomplete: operator metadata is missing.")
     if set(summaries) != set(BACKENDS):
         raise ValueError("Benchmark results are incomplete: all backends are required.")
+    selected_backends = metadata.get("selected_backends")
+    if (
+        not isinstance(selected_backends, list)
+        or len(selected_backends) != len(BACKENDS)
+        or set(selected_backends) != set(BACKENDS)
+    ):
+        raise ValueError("Benchmark results are incomplete: all backends are required.")
+    if metadata.get("incomplete_reasons") != []:
+        raise ValueError("Benchmark results are incomplete; README was not changed.")
+    if metadata.get("complete") is not True:
+        raise ValueError("Benchmark results are incomplete; README was not changed.")
+    if type(metadata.get("missing_clip_count", 0)) is not int:
+        raise ValueError("Benchmark results are incomplete: missing clip count is invalid.")
+    if metadata.get("missing_clip_count", 0) != 0:
+        raise ValueError("Benchmark results are incomplete: clips are missing.")
+    if len(records) != clip_count * len(BACKENDS) or any(
+        not isinstance(record, dict) for record in records
+    ):
+        raise ValueError("Benchmark results are incomplete: record count is inconsistent.")
+
+    expected_clip_ids: set[str] | None = None
     for backend in BACKENDS:
         summary = summaries[backend]
-        if summary.get("not_configured") or summary.get("attempted") != clip_count:
+        if not isinstance(summary, dict):
+            raise ValueError(f"Benchmark results are incomplete for {backend}; summary is missing.")
+        count_fields = (
+            "total_clips",
+            "attempted",
+            "correct",
+            "accuracy_numerator",
+            "accuracy_denominator",
+            "not_configured",
+            "missing_inputs",
+        )
+        if any(type(summary.get(field)) is not int for field in count_fields):
+            raise ValueError(f"Benchmark results are incomplete for {backend}; counts are invalid.")
+        if any(summary[field] < 0 for field in count_fields):
+            raise ValueError(f"Benchmark results are incomplete for {backend}; counts are invalid.")
+        backend_records = [record for record in records if record.get("backend") == backend]
+        clip_ids = {record.get("clip_id") for record in backend_records}
+        if (
+            len(backend_records) != clip_count
+            or len(clip_ids) != clip_count
+            or any(not isinstance(clip_id, str) or not clip_id for clip_id in clip_ids)
+        ):
             raise ValueError(
-                f"Benchmark results are incomplete for {backend}; README was not changed."
+                f"Benchmark results are incomplete for {backend}; record count is inconsistent."
+            )
+        if expected_clip_ids is None:
+            expected_clip_ids = clip_ids
+        elif clip_ids != expected_clip_ids:
+            raise ValueError(
+                f"Benchmark results are incomplete for {backend}; clip records do not match."
+            )
+        if any(record.get("error_code") == "missing_clip" for record in backend_records):
+            raise ValueError(f"Benchmark results are incomplete for {backend}; clips are missing.")
+        if summary.get("total_clips") != clip_count:
+            raise ValueError(
+                f"Benchmark results are incomplete for {backend}; total clip count is inconsistent."
+            )
+        if summary.get("not_configured") or summary.get("missing_inputs"):
+            raise ValueError(
+                f"Benchmark results are incomplete for {backend}; clips or credentials are missing."
+            )
+        if summary.get("attempted") != clip_count:
+            raise ValueError(
+                f"Benchmark results are incomplete for {backend}; attempted count is inconsistent."
+            )
+        if summary.get("accuracy_denominator") != summary.get("attempted"):
+            raise ValueError(
+                f"Benchmark results are incomplete for {backend}; accuracy denominator is inconsistent."
+            )
+        if summary.get("accuracy_numerator") != summary.get("correct"):
+            raise ValueError(
+                f"Benchmark results are incomplete for {backend}; accuracy numerator is inconsistent."
+            )
+        if summary["correct"] > summary["attempted"]:
+            raise ValueError(
+                f"Benchmark results are incomplete for {backend}; accuracy counts are inconsistent."
             )
 
 

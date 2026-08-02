@@ -156,6 +156,16 @@ def _cache_file(cache_dir: Path, key: str) -> Path:
     return cache_dir / f"{key}.json"
 
 
+def _cache_state(cache_hits: int, cache_misses: int) -> str:
+    if cache_hits and cache_misses:
+        return "mixed"
+    if cache_hits:
+        return "warm"
+    if cache_misses:
+        return "cold"
+    return "empty"
+
+
 def _read_cache(cache_dir: Path, key: str) -> dict[str, Any] | None:
     try:
         data = json.loads(_cache_file(cache_dir, key).read_text(encoding="utf-8"))
@@ -275,7 +285,10 @@ def _run_backend(
 
 
 def _group_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
-    attempted = [record for record in records if record["status"] != "not_configured"]
+    configured_records = [record for record in records if record["status"] != "not_configured"]
+    attempted = [
+        record for record in configured_records if record.get("error_code") != "missing_clip"
+    ]
     correct = [record for record in attempted if record["correct"]]
     denominator = len(attempted)
     latencies = [record["latency_ms"] for record in attempted if "latency_ms" in record]
@@ -288,9 +301,13 @@ def _group_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     provider_error = count(lambda record: record["status"] == "error")
     timeout = count(lambda record: record.get("error_code") == "timeout")
     unusable = count(lambda record: record["status"] == "invalid_audio")
+    missing = sum(record.get("error_code") == "missing_clip" for record in configured_records)
 
     def rate(numerator: int) -> float | None:
         return round(numerator / denominator, 4) if denominator else None
+
+    def input_rate(numerator: int) -> float | None:
+        return round(numerator / len(configured_records), 4) if configured_records else None
 
     return {
         "attempted": denominator,
@@ -308,7 +325,9 @@ def _group_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         "timeout_rate": rate(timeout),
         "unusable_inputs": unusable,
         "unusable_input_rate": rate(unusable),
-        "not_configured": len(records) - denominator,
+        "missing_inputs": missing,
+        "missing_input_rate": input_rate(missing),
+        "not_configured": sum(record["status"] == "not_configured" for record in records),
         "latency_ms": {
             "mean": round(statistics.mean(latencies), 2) if latencies else None,
             "median": round(statistics.median(latencies), 2) if latencies else None,
@@ -387,8 +406,17 @@ def _incomplete_reasons(
     for backend in selected_backends:
         if summaries[backend]["not_configured"]:
             reasons.append(f"{backend} credentials or local index are incomplete")
-        if summaries[backend]["attempted"] != clip_count:
+        if summaries[backend]["missing_inputs"]:
+            reasons.append(f"{backend} has missing or unusable clips")
+        expected_records = (
+            summaries[backend]["attempted"]
+            + summaries[backend]["missing_inputs"]
+            + summaries[backend]["not_configured"]
+        )
+        if summaries[backend]["total_clips"] != clip_count or expected_records != clip_count:
             reasons.append(f"{backend} did not produce one result per clip")
+        if summaries[backend]["accuracy_denominator"] != summaries[backend]["attempted"]:
+            reasons.append(f"{backend} has an inconsistent accuracy denominator")
     return reasons
 
 
@@ -405,7 +433,8 @@ def render_markdown(results: dict[str, Any]) -> str:
         f"- Timeout: `{metadata['timeout_seconds']}s`",
         f"- Cache state: `{metadata['cache_state']}`",
         "",
-        "Accuracy denominator is attempted clips; `not_configured` results are excluded and reported separately.",
+        "Accuracy denominator is attempted clips; missing clips are visible as unusable inputs and excluded, while `not_configured` results are reported separately.",
+        "Cache-hit latency is local cache-read time, not provider recognition time; mixed reports can contain both latency types.",
         "Stable provider identifiers are used when a matching manifest identifier is supplied; otherwise normalized title and artist are the documented fallback.",
         "",
         "| Backend | Clips | Attempted | Correct | Accuracy | No-match | False-positive | Provider error | Timeout | Unusable | Mean ms | Median ms | P95 ms |",
@@ -427,7 +456,7 @@ def render_markdown(results: dict[str, Any]) -> str:
                 f"- `{length}s`: {values['accuracy_numerator']}/{values['accuracy_denominator']} "
                 f"correct ({values['accuracy']})"
             )
-            lines.extend(["", f"## {backend} by recording condition"])
+        lines.extend(["", f"## {backend} by recording condition"])
         for condition, values in summary["by_recording_condition"].items():
             lines.append(
                 f"- `{condition}`: {values['accuracy_numerator']}/{values['accuracy_denominator']} "
@@ -475,7 +504,7 @@ def run(
                     "error_code": "missing_clip",
                     "correct": False,
                     "identity_method": "not_applicable",
-                    "failure_reason": "benchmark input could not be decoded",
+                    "failure_reason": "benchmark clip file is missing",
                 }
                 records.append(record)
                 continue
@@ -514,7 +543,10 @@ def run(
 
     summaries = {backend: _aggregate(records, backend) for backend in selected_backends}
     reasons = _incomplete_reasons(selected_backends, summaries, len(rows))
-    cache_state = "warm" if cache_hits and not cache_misses else "cold" if cache_misses else "empty"
+    cache_state = _cache_state(cache_hits, cache_misses)
+    missing_clip_ids = {
+        record["clip_id"] for record in records if record.get("error_code") == "missing_clip"
+    }
     metadata = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "os": platform.platform(aliased=True),
@@ -526,6 +558,7 @@ def run(
         "cache_state": cache_state,
         "cache_hits": cache_hits,
         "cache_misses": cache_misses,
+        "missing_clip_count": len(missing_clip_ids),
         "refresh_cache": refresh_cache,
         "selected_backends": selected_backends,
         "complete": not reasons,
