@@ -4,7 +4,7 @@
 
 DIY Shazam is an audio-recognition project with a command-line entry point and a Flask browser application. It accepts microphone input and audio files, normalizes them through a shared pipeline, and attempts recognition through configured external providers or a local constellation-hash index.
 
-**Current status:** Source-verified on audit branch `codex/audio-recognition-p0-audit` at `6eb46cf`, with 193 local pytest tests, Ruff, and `git diff --check` passing. PR #11 is pushed, open, and draft; no current-branch CI status entries were reported by the connected GitHub check. No live demo URL, complete real-world benchmark, or credentialed provider result is currently available.
+**Current status:** The showcase-ready browser polish is being prepared on feature branch `codex/showcase-ready-20260913`. The feature branch passes 193 local pytest tests, 82% branch coverage, Ruff, Python compilation, and diff checks; the Flask page was also smoke-tested in the in-app browser at desktop and 390px/320px mobile widths with no current console errors. Remote `main` is at `86359d5` with successful CI run [33418693705](https://github.com/icecold009/Audio-Recognition/actions/runs/33418693705) for the merged baseline. No live demo URL, complete real-world benchmark, or credentialed provider result is currently available.
 
 ## Problem and audience
 
@@ -64,9 +64,9 @@ The benchmark runner requires 30 source tracks, one 4-, 8-, and 15-second microp
 ## Implementation highlights
 
 - Flask `web/` is the single supported browser application.
-- The browser supports upload, recording, waveform visualization, light/dark theme, retry states, and optional session-only history.
+- The browser supports a microphone-first CTA, upload, waveform visualization, expandable runtime details, structured match/error/retry states, light/dark theme, focus-aware song details, and optional session-only history.
 - Web uploads support WAV, MP3, M4A, AAC, OGG, FLAC, and WEBM; FFmpeg conversion is bounded by duration and output-size limits.
-- The current audit branch (`6eb46cf`) includes the `b0b8d79` audio-pipeline/browser-recovery hardening baseline plus the documentation and evaluation-gate reconciliation.
+- The current feature branch adds the browser presentation slice on top of the merged audio-pipeline, production-safety, benchmark-tooling, and documentation baseline.
 - CI runs Python tests on 3.10, 3.11, and 3.12, Ruff formatting/lint, branch coverage, dependency auditing, secret scanning, Render Blueprint validation, and a production-container smoke path.
 
 ## Validation and results
@@ -78,11 +78,12 @@ The benchmark runner requires 30 source tracks, one 4-, 8-, and 15-second microp
 - The repository contains a reproducible benchmark command and refuses incomplete README imports.
 - The checked-in FFT image is a real project artifact, but it is a diagnostic spectrum and not evidence of recognition quality.
 
-### Verified locally on the current audit branch
+### Verified locally on the current showcase feature branch
 
-- `.venv-pipeline\Scripts\python.exe -m pytest -q` completed with `193 passed in 9.56s`; the initial non-elevated launcher failed before test collection because it could not create the configured Python process.
-- `.venv-pipeline\Scripts\ruff.exe check .` passed, and `git diff --check` produced no output.
+- `.venv-pipeline\Scripts\python.exe -m coverage run --branch --source=shazam_project,web,scripts -m pytest -q` completed with `193 passed in 12.23s`; the initial non-elevated launcher failed before test collection because it could not create the configured Python process.
+- The coverage gate reported `82%` branch coverage, Ruff lint and formatting passed, Python compilation passed, and `git diff --check` produced no output.
 - A local development HTTP smoke returned 200 for `/` and `/healthz`, exposed upload and record controls, returned non-secret `/api/status`, returned the stable `invalid_audio` response for a malformed upload, and returned `/readyz` 503 because no recognition backend is configured.
+- In-app browser smoke verified the page identity, meaningful first viewport, empty-upload recovery card, runtime-details disclosure, theme toggle, no horizontal overflow at 390px and 320px, and no current console errors. Microphone permission was not requested.
 - `sounddevice.query_devices()` listed 33 host devices, including input and output devices. No microphone recording or provider call was made.
 
 ### Verified remotely on merged `main`
@@ -91,7 +92,7 @@ The merged [PR #8](https://github.com/icecold009/Audio-Recognition/pull/8) recor
 
 ### Not yet verified
 
-- The current branch has not received a remote CI run; local checks are not equivalent to the full hosted matrix.
+- The current feature branch has not been pushed, so its UI changes have no remote CI result yet; the successful remote run applies to the merged baseline at `86359d5`.
 - No complete real-world corpus has been recorded.
 - No credentialed provider comparison, recognition accuracy, p95 latency, catalog coverage, or live deployment smoke is claimed.
 - The in-app browser could not reach the elevated local listener, so no browser-engine/permission screenshot or real browser microphone capture is claimed. Source and mocked tests cover the recording fallback and cleanup paths.

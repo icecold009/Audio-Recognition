@@ -181,7 +181,7 @@ missing lawful corpus, credentials, or real benchmark execution.
 - [x] Add RapidAPI configuration to `/api/status`; report the actual active backend order.
 - [x] Standardize response fields and statuses across all providers and the CLI/browser consumers, including local `no_match` responses.
 - [x] Correct the CLI missing-configuration message so it identifies missing recognition configuration generically rather than naming AudD only.
-- [ ] Add a health/startup check that clearly reports missing provider, Supabase, FFmpeg, and `fpcalc` configuration.
+- [x] Add a health/startup check that clearly reports missing provider, Supabase, FFmpeg, and `fpcalc` configuration.
 
 ### Rate limiting and production safety
 
@@ -197,7 +197,7 @@ missing lawful corpus, credentials, or real benchmark execution.
 - [x] Add `Retry-After` headers to rate-limit responses.
 - [x] Disable `debug=True` outside an explicitly local development mode.
 - [ ] Add a production WSGI/server configuration and document deployment assumptions.
-- [ ] Add tests for unauthorized requests, daily limits, monthly limits, cooldowns, concurrent requests, and Supabase failures.
+- [x] Add tests for unauthorized requests, daily limits, monthly limits, cooldowns, concurrent requests, and Supabase failures.
 
 ## P1 — engineering quality and verification
 
@@ -231,10 +231,10 @@ missing lawful corpus, credentials, or real benchmark execution.
 
 ## P1 — documentation reconciliation
 
-- [ ] Split documentation into “Implemented”, “Known limitations”, “Planned”, and “Evaluation evidence”.
-- [ ] Mark Supabase authentication, persistent user history, RLS-backed history, account deletion, settings, and protected routes as planned unless implemented.
+- [x] Split documentation into “Implemented”, “Known limitations”, “Planned”, and “Evaluation evidence”.
+- [x] Mark Supabase authentication, persistent user history, RLS-backed history, account deletion, settings, and protected routes as planned unless implemented.
 - [x] Reconcile the README with the actual Flask source tree.
-- [ ] Reconcile the documented 8-second CLI behavior, 5-second RapidAPI trim, and 10-second browser recording behavior.
+- [x] Reconcile the documented 8-second CLI behavior, 5-second RapidAPI trim, and 10-second browser recording behavior.
 - [x] Document that the current FFT is diagnostic and not used for matching.
 - [x] Replace the stale README “Add CI” roadmap entry with the implemented pytest, coverage, lint, and build gates.
 - [ ] Document the exact source and command used to generate each screenshot.
@@ -273,6 +273,7 @@ Record evidence here as work lands:
 
 | Date | Task/check | Evidence | Result |
 |---|---|---|---|
+| 2026-09-13 | Showcase-ready browser polish | Feature branch `codex/showcase-ready-20260913`; local Flask browser smoke verified first viewport, theme toggle, runtime-details disclosure, empty-upload recovery, no horizontal overflow at 390px/320px, and no current console errors. | Microphone-first CTA, structured result/error cards, focus-aware details modal, safe external links, and current/roadmap documentation boundary added. Provider credentials, real recording, benchmark corpus, and live deployment remain open. |
 | 2026-08-17 | Current checkout audit and documentation reconciliation | Dedicated branch `codex/audio-recognition-p0-audit`; supported `.venv-pipeline` ran 193 tests; FFmpeg and fpcalc were available; local browser smoke checked page load, status rendering, and unsupported-upload handling; `/readyz`/quota/WSGI behavior is covered by repository tests. | Production/configuration and documentation checkboxes updated. No provider values, source catalog, microphone clips, benchmark results, or credentialed smoke evidence are present locally, so the real benchmark and release gates remain open. |
 | 2026-08-01 | Production rate limits | Added `production_rate_limits` migration through the Supabase CLI; private row-locked quota RPC, RLS with no public policies, server-only service-role access, HMAC client identifiers, fail-closed 503 handling, development fallback, trusted-proxy configuration, direct API-secret authentication, and Retry-After responses. | 93 tests passed; 68% total branch coverage; compileall and diff checks passed. Local/linked SQL execution remains unavailable: Docker is not running and the linked `shazam-project` is inactive; linked advisors returned no lints and migration listing timed out. |
 | 2026-08-01 | Prompt 3 cleanup and review fixes | Flask status display restored RapidAPI and Supabase fields; local `no_match` uses the shared `result: null` shape; all providers receive normalized mono float32 audio; provider diagnostics are safe; rate limits run before upload processing; fixed 16-bit provider WAV encoding is documented; README/TODO record the validated contract and Prompt 4 production blockers. | 73 tests passed; 66% total branch coverage; compileall and diff checks passed locally; CI and `coverage.xml` artifact are pending this push; Codecov upload previously reported `Repository not found` and remains deferred |

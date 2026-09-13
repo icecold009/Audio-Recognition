@@ -4,6 +4,12 @@ const recBtn = document.getElementById('recBtn');
 const stopBtn = document.getElementById('stopBtn');
 const resultDiv = document.getElementById('result');
 const statusDiv = document.getElementById('status');
+const statusMessage = document.getElementById('statusMessage');
+const statusToggle = document.getElementById('statusToggle');
+const statusDetails = document.getElementById('statusDetails');
+const captureHint = document.getElementById('captureHint');
+const recBtnLabel = document.getElementById('recBtnLabel');
+const waveform = document.querySelector('.waveform');
 
 let mediaRecorder;
 let chunks = [];
@@ -104,16 +110,33 @@ function buildStreamingLink(title, artist) {
     return `https://open.spotify.com/search/${q}`;
 }
 
+function safeStreamingLink(value, title, artist) {
+    try {
+        const url = new URL(value);
+        if (url.protocol === 'https:') return url.href;
+    } catch {
+        // Fall back to a safe, generated Spotify search URL.
+    }
+    return buildStreamingLink(title, artist);
+}
+
 function setMicLabel() {
+    const label = isProcessing ? 'Identifying…' : (isListening ? 'Listening…' : 'Start Recording');
+    if (recBtnLabel) recBtnLabel.textContent = label;
     if (recBtn) {
-        recBtn.textContent = isProcessing ? 'Identifying…' : (isListening ? 'Listening…' : 'Start Recording');
-        recBtn.setAttribute(
-            'aria-label',
-            isProcessing ? 'Identifying song' : (isListening ? 'Stop listening' : 'Identify song')
-        );
+        recBtn.setAttribute('aria-label', isProcessing ? 'Identifying song' : (isListening ? 'Stop listening' : 'Identify song'));
+        recBtn.setAttribute('aria-pressed', String(isListening));
+        recBtn.setAttribute('aria-busy', String(isProcessing));
+        recBtn.classList.toggle('is-listening', isListening);
+        recBtn.classList.toggle('is-processing', isProcessing);
     }
     if (stopBtn) {
-        stopBtn.setAttribute('aria-label', 'Stop recording');
+        stopBtn.setAttribute('aria-label', isListening ? 'Stop recording' : 'Stop recording');
+    }
+    if (captureHint) {
+        captureHint.textContent = isProcessing
+            ? 'Identifying your recording…'
+            : (isListening ? 'Listening… stop when you have enough audio.' : 'Tap the microphone to listen for up to 10 seconds.');
     }
 }
 
@@ -123,6 +146,7 @@ function setSubmittingState(loading) {
     uploadBtn.disabled = loading || isListening;
     recBtn.disabled = loading || (mediaRecorder && mediaRecorder.state !== 'inactive');
     stopBtn.disabled = !loading && (!mediaRecorder || mediaRecorder.state === 'inactive');
+    resultDiv.setAttribute('aria-busy', String(loading));
     setMicLabel();
 }
 
@@ -134,6 +158,10 @@ function setListeningState(active) {
     } else {
         recBtn.disabled = false;
         stopBtn.disabled = true;
+    }
+    if (waveform) {
+        waveform.classList.toggle('is-active', active);
+        waveform.setAttribute('aria-label', active ? 'Live microphone waveform' : 'Idle waveform visualizer');
     }
     setMicLabel();
 }
@@ -208,77 +236,86 @@ function showDetailModal(item) {
 
     const overlay = document.createElement('div');
     overlay.id = 'detail-modal';
-    overlay.style.position = 'fixed';
-    overlay.style.inset = '0';
-    overlay.style.background = 'rgba(0,0,0,0.55)';
-    overlay.style.display = 'flex';
-    overlay.style.alignItems = 'center';
-    overlay.style.justifyContent = 'center';
-    overlay.style.padding = '16px';
-    overlay.style.zIndex = '9999';
+    overlay.className = 'detail-modal-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'detail-modal-title');
+    overlay.tabIndex = -1;
+
+    const previousFocus = document.activeElement;
+    const closeModal = () => {
+        overlay.remove();
+        if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+    };
 
     const modal = document.createElement('div');
-    modal.className = 'panel';
-    modal.style.width = 'min(100%, 520px)';
-    modal.style.maxHeight = '90vh';
-    modal.style.overflowY = 'auto';
-    modal.style.display = 'grid';
-    modal.style.gap = '12px';
+    modal.className = 'panel detail-modal';
 
     const closeBtn = document.createElement('button');
+    closeBtn.className = 'detail-close';
+    closeBtn.type = 'button';
     closeBtn.textContent = 'Close';
-    closeBtn.style.width = 'fit-content';
-    closeBtn.addEventListener('click', () => overlay.remove());
+    closeBtn.addEventListener('click', closeModal);
 
+    const header = document.createElement('div');
+    header.className = 'detail-modal-header';
     const heading = document.createElement('h2');
+    heading.id = 'detail-modal-title';
     heading.textContent = 'Song Details';
+    header.appendChild(heading);
+    header.appendChild(closeBtn);
 
-    const title = document.createElement('div');
-    title.textContent = `Title: ${item.title || '(unknown)'}`;
-
-    const artist = document.createElement('div');
-    artist.textContent = `Artist: ${item.artist || '(unknown)'}`;
-
-    const album = document.createElement('div');
-    album.textContent = `Album: ${item.album || '(unknown)'}`;
-
-    const genre = document.createElement('div');
-    genre.textContent = `Genre: ${item.genre || '(not available)'}`;
-
-    const releaseDate = document.createElement('div');
-    releaseDate.textContent = `Release Date: ${item.release_date || '(not available)'}`;
+    const fields = document.createElement('div');
+    fields.className = 'detail-fields';
+    const appendField = (label, value) => {
+        const field = document.createElement('div');
+        field.className = 'detail-field';
+        const fieldLabel = document.createElement('span');
+        fieldLabel.className = 'detail-field-label';
+        fieldLabel.textContent = label;
+        const fieldValue = document.createElement('span');
+        fieldValue.className = 'detail-field-value';
+        fieldValue.textContent = value;
+        field.appendChild(fieldLabel);
+        field.appendChild(fieldValue);
+        fields.appendChild(field);
+    };
 
     const link = document.createElement('a');
-    link.href = item.streaming_url || buildStreamingLink(item.title, item.artist);
+    link.className = 'button-link';
+    link.href = safeStreamingLink(item.streaming_url, item.title, item.artist);
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.textContent = 'Open in Spotify';
-
-    modal.appendChild(closeBtn);
-    modal.appendChild(heading);
 
     if (item.image) {
         const img = document.createElement('img');
         img.src = item.image;
         img.alt = item.title || 'Album art';
-        img.style.maxWidth = '220px';
-        img.style.borderRadius = '12px';
+        img.className = 'detail-art';
         modal.appendChild(img);
     }
 
-    modal.appendChild(title);
-    modal.appendChild(artist);
-    modal.appendChild(album);
-    modal.appendChild(genre);
-    modal.appendChild(releaseDate);
+    appendField('Title', item.title || '(unknown)');
+    appendField('Artist', item.artist || '(unknown)');
+    appendField('Album', item.album || '(unknown)');
+    appendField('Genre', item.genre || '(not available)');
+    appendField('Release date', item.release_date || '(not available)');
+
+    modal.prepend(header);
+    modal.appendChild(fields);
     modal.appendChild(link);
 
     overlay.appendChild(modal);
     overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) overlay.remove();
+        if (e.target === overlay) closeModal();
+    });
+    overlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
     });
 
     document.body.appendChild(overlay);
+    closeBtn.focus();
 }
 
 function renderSettings() {
@@ -287,23 +324,21 @@ function renderSettings() {
 
     const section = document.createElement('section');
     section.id = 'settings-section';
-    section.className = 'panel stack';
-    section.style.marginTop = '20px';
+    section.className = 'panel settings-panel';
 
     const heading = document.createElement('h2');
     heading.textContent = 'Privacy';
 
     const label = document.createElement('label');
-    label.style.display = 'flex';
-    label.style.alignItems = 'center';
-    label.style.gap = '10px';
-    label.style.fontWeight = '600';
+    label.className = 'toggle-row';
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
+    checkbox.className = 'toggle-input';
     checkbox.checked = isHistoryEnabled();
 
     const text = document.createElement('span');
+    text.className = 'toggle-copy';
     text.textContent = 'Save history in this session';
 
     checkbox.addEventListener('change', () => {
@@ -318,6 +353,7 @@ function renderSettings() {
     label.appendChild(text);
 
     const note = document.createElement('div');
+    note.className = 'settings-note';
     note.textContent = 'When off, recognized songs will not be stored in session history.';
 
     section.appendChild(heading);
@@ -334,8 +370,7 @@ function renderHistory() {
 
     const section = document.createElement('section');
     section.id = 'history-section';
-    section.className = 'stack';
-    section.style.marginTop = '20px';
+    section.className = 'history-section';
 
     const h2 = document.createElement('h2');
     h2.className = 'section-heading';
@@ -353,33 +388,45 @@ function renderHistory() {
     } else {
         history.forEach((item, index) => {
             const card = document.createElement('div');
-            card.className = 'panel';
-            card.style.display = 'grid';
-            card.style.gap = '6px';
-            card.style.marginBottom = '12px';
+            card.className = 'history-card';
 
             const title = document.createElement('div');
+            title.className = 'history-title';
             title.textContent = `Song: ${item.title || '(unknown)'}`;
 
             const artist = document.createElement('div');
+            artist.className = 'history-artist';
             artist.textContent = `Artist: ${item.artist || '(unknown)'}`;
 
             const album = document.createElement('div');
+            album.className = 'history-artist';
             album.textContent = `Album: ${item.album || '(unknown)'}`;
 
-            const time = document.createElement('div');
+            const time = document.createElement('time');
+            time.className = 'history-time';
+            const timestamp = new Date(item.timestamp);
+            if (!Number.isNaN(timestamp.getTime())) time.dateTime = timestamp.toISOString();
             time.textContent = `Recognized: ${new Date(item.timestamp).toLocaleString()}`;
 
             const actions = document.createElement('div');
-            actions.style.display = 'flex';
-            actions.style.gap = '10px';
-            actions.style.flexWrap = 'wrap';
+            actions.className = 'history-actions';
+
+            const copy = document.createElement('div');
+            copy.className = 'history-copy';
+            copy.appendChild(title);
+            copy.appendChild(artist);
+            copy.appendChild(album);
+            copy.appendChild(time);
 
             const viewBtn = document.createElement('button');
+            viewBtn.type = 'button';
+            viewBtn.className = 'button-secondary';
             viewBtn.textContent = 'View Details';
             viewBtn.addEventListener('click', () => showDetailModal(item));
 
             const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'button-secondary';
             delBtn.textContent = 'Remove';
             delBtn.addEventListener('click', () => {
                 const updated = loadHistory();
@@ -391,20 +438,21 @@ function renderHistory() {
             actions.appendChild(viewBtn);
             actions.appendChild(delBtn);
 
-            card.appendChild(title);
-            card.appendChild(artist);
-            card.appendChild(album);
-            card.appendChild(time);
-
             if (item.image) {
                 const img = document.createElement('img');
                 img.src = item.image;
                 img.alt = item.title || 'Album art';
-                img.style.maxWidth = '120px';
-                img.style.borderRadius = '12px';
+                img.className = 'history-art';
                 card.appendChild(img);
+            } else {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'history-art history-art-placeholder';
+                placeholder.setAttribute('aria-hidden', 'true');
+                placeholder.textContent = '♪';
+                card.appendChild(placeholder);
             }
 
+            card.appendChild(copy);
             card.appendChild(actions);
             section.appendChild(card);
         });
@@ -417,31 +465,90 @@ async function refreshStatus() {
     try {
         const res = await fetch('/api/status');
         const s = await res.json();
-        statusDiv.textContent =
-            `RapidAPI: ${s.rapidapi_configured ? 'configured' : 'not configured'}; ` +
-            `AcoustID: ${s.acoustid_configured ? 'configured' : 'not configured'}; ` +
-            `fpcalc on PATH: ${s.fpcalc_on_path ? 'yes' : 'no'}; ` +
-            `FP_CALC_PATH exists: ${s.fpcalc_path_exists ? 'yes' : 'no'}; ` +
-            `ffmpeg on PATH: ${s.ffmpeg_on_path ? 'yes' : 'no'}; ` +
-            `AudD token: ${s.audd_configured ? 'configured' : 'not configured'}; ` +
-            `Supabase: ${s.supabase_configured ? 'configured' : 'not configured'}; ` +
-            `Quota: ${s.quota_mode || 'unknown'}; ` +
-            `Production-grade: ${s.production_grade_quotas_enabled ? 'enabled' : 'disabled'}; ` +
-            `Limits: ${s.daily_limit}/day, ${s.monthly_limit}/month; ` +
-            `Cooldown: ${s.cooldown_seconds}s`;
+        const backends = [
+            ['RapidAPI / Shazam', s.rapidapi_configured],
+            ['AcoustID', s.acoustid_configured],
+            ['AudD', s.audd_configured],
+            ['Local fingerprint index', s.local_index_configured]
+        ];
+        const configuredBackends = backends.filter(([, configured]) => configured).map(([name]) => name);
+        const quotaMode = s.quota_mode || 'unknown';
+        const quotaLabel = s.production_grade_quotas_enabled ? 'Production quota' : `Development quota (${quotaMode})`;
+
+        statusDiv.dataset.state = configuredBackends.length ? 'ready' : 'idle';
+        statusMessage.textContent = configuredBackends.length
+            ? `${configuredBackends.length} recognition backend${configuredBackends.length === 1 ? '' : 's'} ready`
+            : 'Development mode · add a recognition backend to identify audio';
+
+        statusDetails.replaceChildren();
+        const details = [
+            ['Backends', configuredBackends.length ? configuredBackends.join(', ') : 'None configured'],
+            ['Audio tools', `FFmpeg ${s.ffmpeg_on_path ? 'ready' : 'missing'} · fpcalc ${s.fpcalc_on_path ? 'ready' : 'missing'}`],
+            ['Quota', `${quotaLabel} · ${s.daily_limit}/day · ${s.monthly_limit}/month`],
+            ['Audio limits', `${s.min_audio_seconds}s–${s.max_audio_seconds}s · ${Math.round(s.max_upload_bytes / (1024 * 1024))} MiB upload`]
+        ];
+        details.forEach(([label, value]) => {
+            const row = document.createElement('div');
+            row.className = 'status-detail-row';
+            const name = document.createElement('span');
+            name.textContent = label;
+            const detail = document.createElement('strong');
+            detail.textContent = value;
+            row.appendChild(name);
+            row.appendChild(detail);
+            statusDetails.appendChild(row);
+        });
     } catch (err) {
-        statusDiv.innerText = 'Failed to fetch status: ' + err;
+        statusDiv.dataset.state = 'error';
+        statusMessage.textContent = 'Runtime status unavailable';
+        statusDetails.replaceChildren();
     }
+}
+
+function renderResultMessage(title, copy, tone = 'info', icon = 'i', code = '') {
+    resultDiv.replaceChildren();
+    resultDiv.dataset.state = tone;
+
+    const message = document.createElement('div');
+    message.className = 'result-message';
+    message.dataset.tone = tone;
+
+    const resultIcon = document.createElement('span');
+    resultIcon.className = 'result-icon';
+    resultIcon.setAttribute('aria-hidden', 'true');
+    resultIcon.textContent = icon;
+
+    const content = document.createElement('div');
+    content.className = 'result-content';
+    const titleNode = document.createElement('div');
+    titleNode.className = 'result-title';
+    titleNode.textContent = title;
+    const copyNode = document.createElement('div');
+    copyNode.className = 'result-copy';
+    copyNode.textContent = copy;
+    content.appendChild(titleNode);
+    content.appendChild(copyNode);
+    if (code) {
+        const codeNode = document.createElement('div');
+        codeNode.className = 'result-code';
+        codeNode.textContent = code;
+        content.appendChild(codeNode);
+    }
+
+    message.appendChild(resultIcon);
+    message.appendChild(content);
+    resultDiv.appendChild(message);
 }
 
 function renderRetryButton() {
     const retryBtn = document.createElement('button');
+    retryBtn.className = 'button-secondary retry-button';
+    retryBtn.type = 'button';
     retryBtn.textContent = 'Retry';
-    retryBtn.style.marginTop = '10px';
     retryBtn.disabled = isSubmitting;
     retryBtn.addEventListener('click', () => {
         if (lastFile) postFile(lastFile);
-        else resultDiv.innerText = 'Nothing to retry yet.';
+        else renderResultMessage('Nothing to retry yet', 'Choose an audio clip to begin.', 'info', 'i');
     });
     resultDiv.appendChild(retryBtn);
 }
@@ -454,7 +561,7 @@ async function postFile(file) {
 
     const fd = new FormData();
     fd.append('file', file, file.name || 'upload.audio');
-    resultDiv.innerText = 'Uploading...';
+    renderResultMessage('Preparing your audio…', 'Validating a bounded clip and checking the configured recognition backends.', 'info', '…');
 
     try {
         const res = await fetch('/api/match', { method: 'POST', body: fd });
@@ -462,7 +569,7 @@ async function postFile(file) {
         renderResult(data);
         await refreshStatus();
     } catch (err) {
-        resultDiv.innerText = 'Upload error: ' + err;
+        renderResultMessage('Upload failed', 'The audio could not reach the recognition service. Check your connection and try again.', 'error', '!');
         renderRetryButton();
     } finally {
         setSubmittingState(false);
@@ -471,49 +578,96 @@ async function postFile(file) {
 
 function renderResult(data) {
     if (!data) {
-        resultDiv.innerText = 'No response';
+        renderResultMessage('No response received', 'The recognition service returned no usable response.', 'error', '!');
         renderRetryButton();
         return;
     }
     if (data.status === 'rate_limited') {
-        resultDiv.innerText = data.error || 'Too many requests. Please wait and try again.';
+        renderResultMessage('Please wait before trying again', data.error || 'Too many requests. Please wait and try again.', 'error', '⏱');
         return;
     }
     if (data.status === 'not_configured') {
-        resultDiv.innerText = data.error || 'No recognition backend is configured.';
+        renderResultMessage('Recognition is not configured yet', data.error || 'Add a recognition provider or local fingerprint index to identify audio.', 'info', 'i');
         renderRetryButton();
         return;
     }
     if (data.status === 'invalid_audio') {
-        resultDiv.innerText = `${data.error_code || 'invalid_audio'}: ${data.error || 'Audio was rejected.'}`;
+        renderResultMessage('That audio clip could not be used', data.error || 'Audio was rejected. Choose a supported clip and try again.', 'error', '!', data.error_code || 'invalid_audio');
         renderRetryButton();
         return;
     }
     if (data.status === 'error') {
-        resultDiv.innerText = 'Server error: ' + (data.error || 'unknown');
+        renderResultMessage('Recognition hit a problem', data.error || 'The server could not complete recognition.', 'error', '!');
         renderRetryButton();
         return;
     }
     if (data.status === 'no_match') {
-        resultDiv.innerText = 'No match found.';
+        renderResultMessage('No match found', 'Try a clearer clip with less background noise, or move closer to the source.', 'info', '♪');
         renderRetryButton();
         return;
     }
 
-    resultDiv.innerHTML = '';
+    resultDiv.replaceChildren();
+    resultDiv.dataset.state = 'matched';
 
-    const title = document.createElement('div');
-    title.textContent = `Song: ${data.title || '(unknown)'}`;
+    const card = document.createElement('article');
+    card.className = 'match-card';
 
+    const main = document.createElement('div');
+    main.className = 'match-card-main';
+
+    let artwork;
+    if (data.image) {
+        artwork = document.createElement('img');
+        artwork.src = data.image;
+        artwork.alt = data.title || 'Album art';
+        artwork.className = 'match-art';
+        artwork.loading = 'lazy';
+        artwork.referrerPolicy = 'no-referrer';
+    } else {
+        artwork = document.createElement('div');
+        artwork.className = 'match-art match-art-placeholder';
+        artwork.setAttribute('role', 'img');
+        artwork.setAttribute('aria-label', 'Album art unavailable');
+        artwork.textContent = '♪';
+    }
+
+    const copy = document.createElement('div');
+    copy.className = 'match-copy';
+    const matchLabel = document.createElement('div');
+    matchLabel.className = 'match-label';
+    matchLabel.textContent = 'Match found';
+    const title = document.createElement('h3');
+    title.className = 'match-title';
+    title.textContent = data.title || '(unknown)';
     const artist = document.createElement('div');
-    artist.textContent = `Artist: ${data.artist || '(unknown)'}`;
-
+    artist.className = 'match-artist';
+    artist.textContent = data.artist || '(unknown)';
     const album = document.createElement('div');
-    album.textContent = `Album: ${data.album || '(unknown)'}`;
+    album.className = 'match-album';
+    album.textContent = data.album || '(unknown)';
+    copy.appendChild(matchLabel);
+    copy.appendChild(title);
+    copy.appendChild(artist);
+    copy.appendChild(album);
+
+    main.appendChild(artwork);
+    main.appendChild(copy);
 
     const detailBtn = document.createElement('button');
-    detailBtn.textContent = 'View Details';
-    detailBtn.style.marginTop = '10px';
+    detailBtn.className = 'button-secondary';
+    detailBtn.type = 'button';
+    detailBtn.textContent = 'View details';
+
+    const streamingLink = document.createElement('a');
+    streamingLink.className = 'button-link';
+    streamingLink.href = safeStreamingLink(data.streaming_url, data.title, data.artist);
+    streamingLink.target = '_blank';
+    streamingLink.rel = 'noopener noreferrer';
+    streamingLink.textContent = 'Open in Spotify';
+
+    const actions = document.createElement('div');
+    actions.className = 'match-actions';
 
     const item = {
         title: data.title || '',
@@ -522,24 +676,16 @@ function renderResult(data) {
         genre: data.genre || '',
         release_date: data.release_date || '',
         image: data.image || '',
-        streaming_url: data.streaming_url || buildStreamingLink(data.title, data.artist),
+        streaming_url: safeStreamingLink(data.streaming_url, data.title, data.artist),
         timestamp: Date.now()
     };
 
     detailBtn.addEventListener('click', () => showDetailModal(item));
-
-    resultDiv.appendChild(title);
-    resultDiv.appendChild(artist);
-    resultDiv.appendChild(album);
-
-    if (data.image) {
-        const img = document.createElement('img');
-        img.src = data.image;
-        img.alt = data.title || 'Album art';
-        resultDiv.appendChild(img);
-    }
-
-    resultDiv.appendChild(detailBtn);
+    actions.appendChild(detailBtn);
+    actions.appendChild(streamingLink);
+    card.appendChild(main);
+    card.appendChild(actions);
+    resultDiv.appendChild(card);
 
     addToHistory(item);
     renderHistory();
@@ -551,10 +697,19 @@ renderSettings();
 renderHistory();
 setMicLabel();
 
+if (statusToggle) {
+    statusToggle.addEventListener('click', () => {
+        const expanded = statusToggle.getAttribute('aria-expanded') === 'true';
+        statusToggle.setAttribute('aria-expanded', String(!expanded));
+        statusDetails.hidden = expanded;
+        statusToggle.textContent = expanded ? 'View details' : 'Hide details';
+    });
+}
+
 uploadBtn.addEventListener('click', () => {
     const f = fileInput.files[0];
     if (!f) {
-        resultDiv.innerText = 'Select a file first.';
+        renderResultMessage('Select an audio file first', 'Choose a supported clip below, then try the upload again.', 'info', '↑');
         return;
     }
     postFile(f);
@@ -564,7 +719,7 @@ recBtn.addEventListener('click', async () => {
     if (isSubmitting || isListening) return;
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        resultDiv.innerText = 'Microphone not supported in this browser.';
+        renderResultMessage('Microphone unavailable', 'This browser does not expose microphone capture. Use an audio file instead.', 'error', '!');
         renderRetryButton();
         return;
     }
@@ -598,7 +753,7 @@ recBtn.addEventListener('click', async () => {
             chunks = [];
 
             if (blob.size === 0) {
-                resultDiv.innerText = 'No audio recorded.';
+                renderResultMessage('No audio was recorded', 'Try again and keep the microphone permission active while listening.', 'error', '!');
                 renderRetryButton();
                 recBtn.disabled = false;
                 stopBtn.disabled = true;
@@ -617,7 +772,7 @@ recBtn.addEventListener('click', async () => {
 
         mediaRecorder.start(1000);
         setListeningState(true);
-        resultDiv.innerText = 'Recording... (auto-stops after 10 seconds)';
+        renderResultMessage('Listening…', 'The waveform is live. Stop when you have enough audio, or wait for the 10-second limit.', 'info', '◉');
 
         stopTimer = setTimeout(() => {
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -625,7 +780,7 @@ recBtn.addEventListener('click', async () => {
             }
             recBtn.disabled = false;
             stopBtn.disabled = true;
-            resultDiv.innerText = 'Recording stopped automatically after 10 seconds.';
+            if (captureHint) captureHint.textContent = 'Recording stopped automatically after 10 seconds.';
         }, 10000);
     } catch (err) {
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -635,7 +790,7 @@ recBtn.addEventListener('click', async () => {
         stopMediaStream();
         stopVisualizer();
         setListeningState(false);
-        resultDiv.innerText = 'Microphone error: ' + err;
+        renderResultMessage('Microphone access failed', 'Allow microphone access or choose an audio file instead.', 'error', '!');
         renderRetryButton();
         recBtn.disabled = false;
         stopBtn.disabled = true;

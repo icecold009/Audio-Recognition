@@ -18,12 +18,15 @@ Validated audio pipeline · Multi-backend matching · Flask web UI · Terminal o
 ## Overview
 DIY Shazam captures audio from the CLI microphone/file path or the Flask browser UI, normalizes it through one bounded audio pipeline, and identifies tracks using RapidAPI/Shazam, AcoustID, AudD, or local spectrogram peaks and constellation hash pairs. FFT output is a diagnostic visualization only; it is not the recognition algorithm. Flask serves the complete browser UI and JSON API from one origin.
 
+The supported web experience is a focused, local-first showcase MVP: a microphone-first recognition flow, a supported upload path, readable runtime diagnostics, recovery-oriented result states, and optional session-only history. Authentication, persistent history, a public deployment, and real-world accuracy claims remain explicit follow-on work rather than implied features.
+
 ## Implemented
 
 - Flask is the supported browser application; `web/app.py` serves the UI and JSON API from one origin.
 - CLI and web inputs use the documented bounded normalization pipeline. The CLI accepts WAV/PCM; the web path converts the documented browser upload formats through FFmpeg.
 - Provider dispatch uses RapidAPI/Shazam, AcoustID, AudD, and the local constellation-hash backend with stable public statuses and safe diagnostics.
 - Production configuration includes Gunicorn, `/healthz`, `/readyz`, bounded uploads and FFmpeg work, atomic Supabase quota operations, trusted-proxy controls, and debug-off defaults outside explicit development mode.
+- The browser surface uses an accessible microphone-first CTA, expandable runtime details, structured match/error cards, safe external links, theme persistence, and focus-aware song details.
 - The current checkout has 193 passing Python tests. CI also defines Ruff, coverage, dependency-audit, and secret-scanning gates.
 
 ## Known limitations
@@ -78,7 +81,7 @@ flowchart LR
   classDef blue fill:#ffffff,stroke:#1E90FF,stroke-width:2px,color:#1E90FF;
   class A,B,C,D,E,F,G,H,I,J,K,L blue;
 ```
-Theme: black / white / blue — white nodes with a professional DodgerBlue accent (#1E90FF). The browser UI is served directly by Flask; there is no separate browser bundle.
+Theme: midnight navy / soft white / electric blue. The browser UI is served directly by Flask; there is no separate browser bundle.
 
 ## Quickstart
 ### Windows PowerShell
@@ -181,7 +184,7 @@ Entrypoints remain:
 Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`, `ACOUSTID_API_KEY`, `FP_CALC_PATH`, `RAPIDAPI_KEY`, and optional `LOCAL_FINGERPRINT_INDEX` (with `FINGERPRINT_INDEX_PATH` accepted as a legacy alias). The shared audio contract is controlled by `INTERNAL_SAMPLE_RATE`, `MIN_AUDIO_SECONDS`, `MAX_AUDIO_SECONDS`, `MAX_UPLOAD_BYTES`, and `FFMPEG_TIMEOUT_SECONDS`; provider WAVs are always fixed 16-bit PCM. Matcher order is RapidAPI → AcoustID → AudD → local fingerprint index.
 
 ## Web UI
-`python web/app.py` serves `/`, `/static/*`, `/api/match`, and `/api/status` from the same origin. CLI file mode accepts WAV/PCM files. Web uploads support WAV, MP3, M4A, AAC, OGG, FLAC, and WEBM; non-WAV web uploads require FFmpeg on `PATH` and are converted before decoding. The browser also supports microphone recording, manual stop, waveform visualization, loading/error/no-match states, light/dark theme persistence, and session-only recognition history.
+`python web/app.py` serves `/`, `/static/*`, `/api/match`, and `/api/status` from the same origin. CLI file mode accepts WAV/PCM files. Web uploads support WAV, MP3, M4A, AAC, OGG, FLAC, and WEBM; non-WAV web uploads require FFmpeg on `PATH` and are converted before decoding. The browser also supports a microphone-first recording flow, manual stop, waveform visualization, expandable capability details, structured loading/error/no-match/match states, light/dark theme persistence, focus-aware song details, and session-only recognition history.
 
 The durations are intentionally different by path: CLI microphone mode defaults to 8 seconds and accepts an interactive override; the RapidAPI/Shazam adapter sends at most the first 5 seconds of the normalized clip; browser recording auto-stops after 10 seconds but can be stopped manually; and the reproducible benchmark uses separate 4-second, 8-second, and 15-second microphone clips.
 

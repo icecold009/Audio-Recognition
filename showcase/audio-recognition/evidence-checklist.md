@@ -6,15 +6,15 @@
 
 | Evidence | Status | Use in showcase |
 |---|---|---|
-| Repository source and documentation | Verified at `6eb46cf` | Supports the architecture, UI, API contract, limits, matcher behavior, evaluation gates, and limitations. |
+| Repository source and documentation | Verified on feature branch `codex/showcase-ready-20260913` | Supports the architecture, UI, API contract, limits, matcher behavior, evaluation gates, and limitations. |
 | Existing FFT image | Verified: [`docs/screenshots/fft-output.png`](../../docs/screenshots/fft-output.png) | Technical visual only; caption it as “Diagnostic frequency spectrum; FFT is not the recognition algorithm.” |
-| Merged-main CI | Verified remotely in [PR #8](https://github.com/icecold009/Audio-Recognition/pull/8) | Supports 190 tests per Python 3.10–3.12 job, 81% branch coverage, static/security gates, Render validation, and container smoke on merged main. |
-| Current audit branch CI | Not reported by connected GitHub check | PR #11 is pushed and draft; local pytest (193), Ruff, and `git diff --check` passed, but local checks are not the hosted matrix/release gate. |
+| Merged-main CI | Verified remotely at `86359d5` in [run 33418693705](https://github.com/icecold009/Audio-Recognition/actions/runs/33418693705) | Supports the current merged baseline's test, lint, coverage, dependency, secret, Render, and container gates. |
+| Current feature branch UI smoke | Verified locally | In-app browser checks cover page identity, first viewport, theme toggle, runtime-details disclosure, empty-upload recovery, and 390px/320px overflow checks. The feature branch is not pushed yet. |
 | Live demo | Missing | Supply a public URL, then run a browser smoke check and label it live evidence. |
-| Real product screenshots | Missing | Capture from the supported Flask app; no browser screenshot was available in this task. |
+| Real product screenshots | Partially verified | Desktop and 390px/320px local captures were reviewed during this task; no screenshot files are committed yet. |
 | Real-world benchmark results | Missing by design | Assemble the legal corpus and run `scripts/benchmark.py`; do not infer quality from synthetic tests or CI. |
 | Credentialed provider smoke | Missing | Configure credentials outside Git and record a redacted, reproducible smoke result. |
-| Fresh local test run | Verified with scoped launch | `.venv-pipeline\Scripts\python.exe -m pytest -q` reported `193 passed in 9.56s`; the initial non-elevated launch failed before collection because the configured Python process was inaccessible. |
+| Fresh local test run | Verified with scoped launch | `.venv-pipeline\Scripts\python.exe -m coverage run --branch --source=shazam_project,web,scripts -m pytest -q` reported `193 passed in 12.23s`; source-scoped coverage reported 82% branch coverage, and the initial non-elevated launch failed before collection because the configured Python process was inaccessible. |
 | Host audio device enumeration | Verified, capture not attempted | `sounddevice.query_devices()` listed 33 devices, including microphone inputs and speaker outputs. This does not prove a real recording or provider recognition result. |
 
 ## Screenshot plan
@@ -39,6 +39,7 @@
 - The local backend uses spectral peaks, hash pairs, and time-offset consensus.
 - Merged-main remote CI recorded 190 tests per Python version, 81% branch coverage, lint/audit/secret gates, Render schema validation, and container smoke.
 - The benchmark tooling refuses incomplete result imports and keeps source audio/provider credentials out of the repository.
+- The current browser polish is locally verified for the first viewport, theme toggle, runtime-details disclosure, empty-upload recovery, and narrow-screen overflow; microphone permission and real recording remain untested.
 
 ### Must remain labeled as missing or unverified
 
@@ -46,13 +47,13 @@
 - Provider superiority, catalog coverage, or robustness under noise/re-encoding.
 - Production uptime, user adoption, testimonials, or deployment readiness.
 - A live hosted URL or browser-engine compatibility.
-- Current-branch remote CI status after `6eb46cf`.
+- A remote CI result for the current feature branch; it has not been pushed.
 - Browser-engine permission state, real microphone capture, and device-to-provider recognition.
 
 ## Follow-up capture procedure
 
 1. Make the supported pipeline interpreter launch without elevation, or document the scoped launch requirement for the developer environment.
-2. Run the full release gate, coverage, compile, Ruff, and diff checks; record the exact commit and output.
-3. Start `python web/app.py` in development mode and capture the home, status, invalid-upload, no-match, and matched-mock states.
+2. Run the full release gate, coverage, compile, Ruff, and diff checks; record the exact feature-branch commit and output.
+3. Start `python web/app.py` in development mode and capture the home, status, invalid-upload, no-match, and matched-mock states. Keep local captures separate from live evidence.
 4. If a live URL is provided, verify the same journey against the deployed app and label screenshots as live rather than local.
 5. Assemble the legally reusable evaluation corpus with track-level provenance/license notes, run the documented benchmark, review generated JSON/Markdown, and import results only if the completeness gate passes.

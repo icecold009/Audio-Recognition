@@ -1,5 +1,7 @@
 # Product Requirements Document (PRD)
 
+> Status: This document records the intended product direction. The current showcase slice is a guest, local-first Flask MVP. Authentication, persistent history, account deletion, and hosted user settings are not implemented and must not be inferred from this document.
+
 **Project:** Shazam Clone — Music Recognition Web App  
 **Author:** Shaurya Saria  
 **Version:** 1.0  
@@ -11,6 +13,18 @@
 ## Overview
 
 A full-stack web application that replicates core Shazam functionality — identifying songs from audio input via microphone or file upload, displaying song metadata (title, artist, album, artwork), and maintaining a personal history of identified tracks. The app targets music listeners who want quick, browser-native song identification without needing a native app.
+
+## Current implementation boundary
+
+| Capability | Current state |
+|---|---|
+| Song recognition | Implemented through the supported Flask UI, CLI, configured provider backends, and optional local fingerprint index. |
+| Guest history | Implemented as optional session-only browser history with removal and detail actions. |
+| Song detail view | Implemented for returned matches, including available metadata and a safe Spotify search fallback. |
+| Authentication and persistent history | Planned; no protected user routes or Supabase Auth flow is shipped. |
+| Account settings and deletion | Planned; the current privacy control only governs session-history storage. |
+
+The showcase and README should describe the current implementation boundary above. The remaining requirements below are retained as the product roadmap, not as claims about the current runtime.
 
 ---
 

@@ -1,7 +1,7 @@
 # Technical Requirements Document
 
 **Project:** Audio Recognition
-**Status:** Current Flask implementation
+**Status:** Current Flask implementation; authentication and persistent-history features remain roadmap items.
 
 ## Architecture
 
@@ -21,7 +21,7 @@ CLI at main.py -> shared shazam_project modules -> matcher backends
 | Layer | Implementation |
 |---|---|
 | Browser UI | Flask templates, vanilla JavaScript, and CSS |
-| Web server | Flask development server for local use; WSGI deployment is planned |
+| Web server | Flask development server for local use; Gunicorn WSGI configuration for deployment |
 | Audio capture | Browser MediaRecorder and Web Audio API visualization |
 | Audio decoding | WAV loader; optional FFmpeg conversion for browser uploads |
 | Recognition | RapidAPI/Shazam, AcoustID, AudD, then local fingerprint index |
@@ -29,7 +29,7 @@ CLI at main.py -> shared shazam_project modules -> matcher backends
 
 ## Browser behavior
 
-The page at `/` supports file upload, microphone capture with manual stop and a ten-second limit, waveform visualization, loading and error states, matched and no-match results, light/dark theme persistence, and session-only history. History is stored in the browser session and is not an authenticated database feature.
+The page at `/` supports a microphone-first recording flow, file upload, manual stop and a ten-second limit, waveform visualization, expandable runtime details, structured loading/error states, matched and no-match results, light/dark theme persistence, focus-aware song details, and session-only history. History is stored in the browser session and is not an authenticated database feature.
 
 ## API contract
 
@@ -37,7 +37,7 @@ The page at `/` supports file upload, microphone capture with manual stop and a 
 
 - `matched`: includes normalized `title`, `artist`, `album`, and optional `image` fields.
 - `no_match`: no configured backend identified the audio.
-- `no_token`: no recognition backend is configured.
+- `not_configured`: no recognition backend is configured.
 - `rate_limited`: the request exceeded a configured limit.
 - `error`: the upload, conversion, provider, or runtime path failed.
 
@@ -45,7 +45,7 @@ The page at `/` supports file upload, microphone capture with manual stop and a 
 
 ## Configuration and security
 
-Provider keys and server configuration are loaded from the root `.env` file. The browser receives no provider keys or server secrets. Same-origin browser requests are accepted when `INTERNAL_API_SECRET` is enabled; optional external API clients must be explicitly listed in `CORS_ORIGINS`.
+Provider keys and server configuration are loaded from the root `.env` file. The browser receives no provider keys or server secrets. When `INTERNAL_API_SECRET` is enabled, requests must present the secret directly; same-origin headers never bypass it. Optional external API clients must be explicitly listed in `CORS_ORIGINS`.
 
 Uploads are bounded by `MAX_UPLOAD_BYTES` and `MAX_AUDIO_SECONDS`. Temporary files are removed after processing, and provider calls have bounded timeouts.
 

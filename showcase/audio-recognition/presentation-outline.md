@@ -1,6 +1,6 @@
 # DIY Shazam — presentation outline
 
-**Status:** Source-verified showcase draft. The repository is a locally validated prototype, not a verified live production demo. This audit PR branch is `codex/audio-recognition-p0-audit` at `6eb46cf`; local pytest (193), Ruff, and diff checks passed, while the latest remote CI evidence applies to merged `origin/main`/PR #8 and no current-branch CI status entries are reported.
+**Status:** Source-verified showcase draft. The repository is a locally validated prototype, not a verified live production demo. The current browser polish is on feature branch `codex/showcase-ready-20260913`; local pytest (193), 82% branch coverage, Ruff, compile, diff, and in-app browser smoke checks passed. Remote CI evidence applies to the merged baseline at `86359d5`; this feature branch is not pushed.
 
 **Audience:** General portfolio audience
 
@@ -8,7 +8,7 @@
 
 **Length:** 7 slides, approximately 2 minutes spoken
 
-**Live demo:** None supplied; browser screenshots remain an evidence gap.
+**Live demo:** None supplied; local browser screenshots were reviewed during verification but are not committed as showcase assets.
 
 ## Slide 1 — DIY Shazam
 
@@ -20,7 +20,7 @@
 - Flask browser UI plus CLI entry point
 - RapidAPI/Shazam, AcoustID, AudD, and local fingerprint backends
 
-**Recommended visual:** A real screenshot of the Flask home screen showing the upload and recording controls. **[NEEDS EVIDENCE]** No live demo or current browser screenshot was supplied. Use `docs/screenshots/fft-output.png` only as a technical fallback, labeled as a diagnostic spectrum rather than a product screenshot.
+**Recommended visual:** A real local screenshot of the Flask home screen showing the microphone-first CTA, concise runtime status, and upload alternative. Keep it labeled as local evidence; use `docs/screenshots/fft-output.png` only as a technical fallback, labeled as a diagnostic spectrum rather than a product screenshot.
 
 **Speaker notes:** “This is DIY Shazam: a song-recognition project built around a practical input pipeline and several interchangeable backends. The interesting part is not just calling an API; it is making microphone input, uploaded files, validation, fallback, and safe failure states behave consistently.”
 
@@ -71,7 +71,7 @@
 - Matched, no-match, invalid-input, rate-limit, and retry states
 - Light/dark theme and optional session-only history
 
-**Recommended visual:** A three-panel screenshot sequence: empty home, result/error state, and history/details. **[NEEDS EVIDENCE]** Capture these from the actual Flask app after restoring a usable runtime or supplying a live URL.
+**Recommended visual:** A three-panel screenshot sequence: empty home, result/error state, and history/details. The empty home and error state can be captured locally; matched/history details still require a deterministic mock or configured provider and must be labeled accordingly.
 
 **Speaker notes:** “The UI is intentionally small: the main job is to capture audio and communicate the next state clearly. The current branch also hardens browser recovery by making storage optional and stopping microphone tracks and visualizer resources when recording ends or fails.”
 
@@ -116,7 +116,7 @@ flowchart LR
 - Merged-main branch coverage: 81%, above the 70% gate
 - Ruff, pip-audit, Gitleaks, Render schema, and container smoke passed remotely
 - Benchmark tooling exists, but no complete corpus or credentialed provider run is imported
-- Current audit branch has local checks but is not yet separately remote-CI-verified
+- Current feature branch UI changes are locally verified but not yet pushed for remote CI
 
 **Recommended visual:** A two-column “verified / still open” scorecard. Do not show invented accuracy or latency values.
 
