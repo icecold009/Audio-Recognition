@@ -96,11 +96,13 @@ Warm paper and graphite make the default state feel calm and tactile; coral supp
 ### Type Scale (web app — responsive and shared)
 
 ```css
---text-display: clamp(4rem, 8.6vw, 7.4rem);      /* hero display */
---text-section:  clamp(2.2rem, 4vw, 3.7rem);     /* result section */
+--text-display: clamp(3.5rem, 7.6vw, 6.5rem);    /* hero display */
+--text-section:  clamp(2rem, 3.4vw, 3.25rem);    /* result section */
+--text-feature:  clamp(1.15rem, 1.65vw, 1.45rem); /* card/control heading */
 --text-body:     clamp(0.98rem, 1.15vw, 1.12rem);  /* body and UI copy */
 --text-support:  clamp(0.82rem, 0.8rem + 0.15vw, 0.95rem);
---text-meta:     0.66rem;                         /* runtime metadata */
+--text-action:   clamp(0.8rem, 0.76rem + 0.1vw, 0.9rem);
+--text-meta:     clamp(0.7rem, 0.68rem + 0.1vw, 0.78rem); /* runtime metadata */
 ```
 
 The implemented rhythm uses a shared 18px label-to-heading gap, a responsive 20–28px heading-to-copy gap, and a responsive 48–76px copy-to-status gap. The full overrides live in [`web/static/typography.css`](../web/static/typography.css), so the type system can be reviewed independently from the larger legacy stylesheet.
