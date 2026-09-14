@@ -2,10 +2,23 @@
     --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
     --font-body: 'Manrope', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --text-display: clamp(4rem, 8.6vw, 7.4rem);
+    --text-section: clamp(2.2rem, 4vw, 3.7rem);
+    --text-body: clamp(0.98rem, 1.15vw, 1.12rem);
+    --text-support: clamp(0.82rem, 0.8rem + 0.15vw, 0.95rem);
+    --text-action: clamp(0.72rem, 0.68rem + 0.15vw, 0.82rem);
+    --text-meta: 0.66rem;
+    --tracking-display: -0.08em;
+    --tracking-meta: 0.14em;
+    --space-label-heading: 1.125rem;
+    --space-heading-copy: clamp(1.25rem, 2vw, 1.75rem);
+    --space-copy-status: clamp(3rem, 7vw, 4.75rem);
 }
 
 body {
     font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.6;
 }
 
 #themeToggle {
@@ -39,48 +52,58 @@ body {
 .status-detail-row,
 .text-button {
     font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: var(--tracking-meta);
+    line-height: 1.4;
 }
 
 .hero-copy {
     max-width: 900px;
-    padding-left: clamp(0px, 3vw, 44px);
+    padding-left: 0;
 }
 
 .eyebrow {
-    margin-left: clamp(0px, 1.4vw, 20px);
+    margin-left: 0;
 }
 
 .page-title {
-    max-width: 8.5ch;
-    font-size: clamp(4rem, 9vw, 8rem);
-    letter-spacing: -0.09em;
-    line-height: 0.91;
+    max-width: 9ch;
+    margin-top: var(--space-label-heading);
+    font-size: var(--text-display);
+    letter-spacing: var(--tracking-display);
+    line-height: 0.93;
 }
 
 .page-subtitle {
-    max-width: 39ch;
-    margin-left: clamp(22px, 9vw, 132px);
-    font-size: clamp(0.98rem, 1.15vw, 1.12rem);
-    line-height: 1.7;
+    max-width: 42ch;
+    margin-left: clamp(12px, 3vw, 42px);
+    margin-top: var(--space-heading-copy);
+    font-size: var(--text-body);
+    line-height: 1.6;
 }
 
 .status-card {
-    margin-left: clamp(0px, 3vw, 44px);
+    margin-top: var(--space-copy-status);
+    margin-left: 0;
 }
 
 .section-heading-row {
     align-items: end;
 }
 
+.section-heading-row > div {
+    gap: var(--space-label-heading);
+}
+
 .section-heading {
-    max-width: 11ch;
-    font-size: clamp(2.2rem, 4vw, 3.7rem);
-    letter-spacing: -0.075em;
-    line-height: 0.96;
+    max-width: 12ch;
+    font-size: var(--text-section);
+    letter-spacing: var(--tracking-display);
+    line-height: 0.98;
 }
 
 .section-note {
-    margin-bottom: 0.42rem;
+    margin-bottom: 0.48rem;
 }
 
 .upload-field label {
@@ -88,13 +111,38 @@ body {
 }
 
 .record-prompt {
-    font-size: clamp(1rem, 1.3vw, 1.2rem);
+    font-size: var(--text-body);
     letter-spacing: -0.035em;
 }
 
+.capture-hint,
+.toggle-copy,
+.settings-note,
+.history-artist,
+.history-time {
+    font-size: var(--text-support);
+    line-height: 1.5;
+}
+
+.secondary-button,
+.button-secondary,
+.button-link,
+#uploadBtn,
+input[type='file']::file-selector-button {
+    font-size: var(--text-action);
+    line-height: 1.25;
+}
+
 .footer-name {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     letter-spacing: -0.035em;
+}
+
+.status-message,
+.status-detail-row,
+.text-button {
+    font-size: var(--text-meta);
+    line-height: 1.5;
 }
 
 @media (max-width: 640px) {
@@ -108,8 +156,8 @@ body {
     }
 
     .page-title {
-        max-width: 8ch;
-        font-size: clamp(3.35rem, 16vw, 5rem);
+        max-width: 8.5ch;
+        font-size: clamp(3.35rem, 16vw, 4.8rem);
     }
 
     .page-subtitle {

@@ -12,7 +12,7 @@ Validated audio pipeline · Multi-backend matching · Flask web UI · Terminal o
 ***
 <div align="center">
   <h1 style="margin:0;padding:0">Audio Recognition</h1>
-  <p style="margin:4px 0 8px;color:#1E90FF">Identify songs from your microphone or an audio file with validated multi-backend matching</p>
+  <p style="margin:4px 0 8px;color:#e35c43">Identify songs from your microphone or an audio file with validated multi-backend matching</p>
 </div>
 
 ## Overview
@@ -46,7 +46,7 @@ Supabase authentication, persistent user history, RLS-backed history, account de
 
 - Reproducible benchmark entry points are documented in [`evaluation/README.md`](evaluation/README.md), but no complete result is present in this checkout.
 - The committed FFT image at [`docs/screenshots/fft-output.png`](docs/screenshots/fft-output.png) is diagnostic output from `shazam_project.fft_analyze.analyze_audio`; the original capture command was not preserved in Git. Recreate it through the CLI's `python main.py` path after choosing `mic` or `file`.
-- The current browser smoke check was run against `python web/app.py` on a local development port with debug disabled. It verified page load, status rendering, and the unsupported-upload error state; it did not use provider credentials or record microphone audio.
+- The current browser smoke check was run against `python web/app.py` on a local development port with debug disabled. It verified page load, status rendering, the runtime-details disclosure, empty-upload recovery, theme switching, and the responsive visual hierarchy at 1280x900 and 390x844; it did not use provider credentials or record microphone audio.
 
 ## Performance
 
@@ -78,10 +78,10 @@ flowchart LR
   F -->|Local hashes| J[Peak/hash index]
   G & H & I & J --> K[Normalized Result]
   K --> L[Display (CLI) / JSON (Web)]
-  classDef blue fill:#ffffff,stroke:#1E90FF,stroke-width:2px,color:#1E90FF;
-  class A,B,C,D,E,F,G,H,I,J,K,L blue;
+  classDef accent fill:#fbfaf7,stroke:#e35c43,stroke-width:2px,color:#171817;
+  class A,B,C,D,E,F,G,H,I,J,K,L accent;
 ```
-Theme: midnight navy / soft white / electric blue. The browser UI is served directly by Flask; there is no separate browser bundle.
+Theme: warm paper / graphite / coral, with an optional dark mode. The browser UI is served directly by Flask; there is no separate browser bundle.
 
 ## Quickstart
 ### Windows PowerShell
@@ -185,6 +185,8 @@ Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`
 
 ## Web UI
 `python web/app.py` serves `/`, `/static/*`, `/api/match`, and `/api/status` from the same origin. CLI file mode accepts WAV/PCM files. Web uploads support WAV, MP3, M4A, AAC, OGG, FLAC, and WEBM; non-WAV web uploads require FFmpeg on `PATH` and are converted before decoding. The browser also supports a microphone-first recording flow, manual stop, waveform visualization, expandable capability details, structured loading/error/no-match/match states, light/dark theme persistence, focus-aware song details, and session-only recognition history.
+
+The current showcase presentation uses Space Grotesk for display headings, Manrope for body and interface copy, and IBM Plex Mono for runtime metadata. Responsive `clamp()` sizing, a small shared type scale, and a consistent label-to-heading-to-copy rhythm keep the editorial layout coherent from the 1280x900 desktop view to the 390x844 mobile view. The warm paper, graphite, and coral palette is implemented in `web/static/style.css`, with the typography refinements isolated in [`web/static/typography.css`](web/static/typography.css).
 
 The durations are intentionally different by path: CLI microphone mode defaults to 8 seconds and accepts an interactive override; the RapidAPI/Shazam adapter sends at most the first 5 seconds of the normalized clip; browser recording auto-stops after 10 seconds but can be stopped manually; and the reproducible benchmark uses separate 4-second, 8-second, and 15-second microphone clips.
 

@@ -9,19 +9,20 @@
 | Repository source and documentation | Verified on feature branch `codex/showcase-ready-20260913` | Supports the architecture, UI, API contract, limits, matcher behavior, evaluation gates, and limitations. |
 | Existing FFT image | Verified: [`docs/screenshots/fft-output.png`](../../docs/screenshots/fft-output.png) | Technical visual only; caption it as “Diagnostic frequency spectrum; FFT is not the recognition algorithm.” |
 | Merged-main CI | Verified remotely at `86359d5` in [run 33418693705](https://github.com/icecold009/Audio-Recognition/actions/runs/33418693705) | Supports the current merged baseline's test, lint, coverage, dependency, secret, Render, and container gates. |
-| Current feature branch UI smoke | Verified locally | In-app browser checks cover page identity, first viewport, theme toggle, runtime-details disclosure, empty-upload recovery, and 390px/320px overflow checks. The feature branch is not pushed yet. |
+| Current feature branch UI smoke | Verified locally | In-app browser checks cover page identity, the 1280x900 desktop and 390x844 mobile views, theme toggle, runtime-details disclosure, empty-upload recovery, responsive spacing, and no horizontal overflow. The feature branch is not pushed yet. |
 | Live demo | Missing | Supply a public URL, then run a browser smoke check and label it live evidence. |
-| Real product screenshots | Partially verified | Desktop and 390px/320px local captures were reviewed during this task; no screenshot files are committed yet. |
+| Real product screenshots | Reviewed locally; no binary committed | Fresh 1280x900 desktop hero/station and 390x844 mobile captures were reviewed in the local browser. They are visual evidence for this task, not committed screenshot assets. |
+| Typography and visual system | Verified locally | Space Grotesk display type, Manrope body/UI copy, IBM Plex Mono metadata, responsive `clamp()` sizing, and a shared label-to-heading-to-copy rhythm are implemented in [`web/static/typography.css`](../../web/static/typography.css). |
 | Real-world benchmark results | Missing by design | Assemble the legal corpus and run `scripts/benchmark.py`; do not infer quality from synthetic tests or CI. |
 | Credentialed provider smoke | Missing | Configure credentials outside Git and record a redacted, reproducible smoke result. |
-| Fresh local test run | Verified with scoped launch | `.venv-pipeline\Scripts\python.exe -m coverage run --branch --source=shazam_project,web,scripts -m pytest -q` reported `193 passed in 12.23s`; source-scoped coverage reported 82% branch coverage, and the initial non-elevated launch failed before collection because the configured Python process was inaccessible. |
+| Fresh local test run | Verified with scoped launch | `.venv-pipeline\Scripts\python.exe -m coverage run --branch --source=shazam_project,web,scripts -m pytest -q` reported `193 passed in 9.62s`; source-scoped coverage reported 82% branch coverage, and the initial non-elevated launch failed before collection because the configured Python process was inaccessible. |
 | Host audio device enumeration | Verified, capture not attempted | `sounddevice.query_devices()` listed 33 devices, including microphone inputs and speaker outputs. This does not prove a real recording or provider recognition result. |
 
 ## Screenshot plan
 
 | Suggested file | What to capture | Source/command | Caption | Status |
 |---|---|---|---|---|
-| `screenshots/01-home-empty.png` | Flask home page with upload, record, and status controls | Start the supported app with `python web/app.py`, then capture `/` | “The single supported Flask browser entry point.” | **[NEEDS EVIDENCE]** |
+| `screenshots/01-home-empty.png` | Flask home page with upload, record, and status controls | Start the supported app with `python web/app.py`, then capture `/` | “The single supported Flask browser entry point.” | Reviewed in local browser at 1280x900 and 390x844; no binary committed |
 | `screenshots/02-status-development.png` | Non-secret `/api/status` capability flags | `GET /api/status` in the local app | “Runtime capability status without secrets.” | **[NEEDS EVIDENCE]** |
 | `screenshots/03-invalid-upload.png` | Malformed or unsupported upload response | `POST /api/match` with a controlled invalid fixture | “Invalid audio is rejected with a stable public status.” | **[NEEDS EVIDENCE]** |
 | `screenshots/04-mock-match.png` | Successful mocked recognition response | Reproduce the CI container smoke fixture or a local deterministic mock | “The UI renders a matched response without exposing provider internals.” | **[NEEDS EVIDENCE]** |
@@ -39,7 +40,7 @@
 - The local backend uses spectral peaks, hash pairs, and time-offset consensus.
 - Merged-main remote CI recorded 190 tests per Python version, 81% branch coverage, lint/audit/secret gates, Render schema validation, and container smoke.
 - The benchmark tooling refuses incomplete result imports and keeps source audio/provider credentials out of the repository.
-- The current browser polish is locally verified for the first viewport, theme toggle, runtime-details disclosure, empty-upload recovery, and narrow-screen overflow; microphone permission and real recording remain untested.
+- The current browser polish is locally verified for the 1280x900 desktop and 390x844 mobile views, consistent typography/spacing, theme toggle, runtime-details disclosure, empty-upload recovery, and narrow-screen overflow; microphone permission and real recording remain untested.
 
 ### Must remain labeled as missing or unverified
 

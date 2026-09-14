@@ -4,7 +4,7 @@
 
 DIY Shazam is an audio-recognition project with a command-line entry point and a Flask browser application. It accepts microphone input and audio files, normalizes them through a shared pipeline, and attempts recognition through configured external providers or a local constellation-hash index.
 
-**Current status:** The showcase-ready browser polish is being prepared on feature branch `codex/showcase-ready-20260913`. The feature branch passes 193 local pytest tests, 82% branch coverage, Ruff, Python compilation, and diff checks; the Flask page was also smoke-tested in the in-app browser at desktop and 390px/320px mobile widths with no current console errors. Remote `main` is at `86359d5` with successful CI run [33418693705](https://github.com/icecold009/Audio-Recognition/actions/runs/33418693705) for the merged baseline. No live demo URL, complete real-world benchmark, or credentialed provider result is currently available.
+**Current status:** The showcase-ready browser presentation and typography refinement are complete on feature branch `codex/showcase-ready-20260913`. The feature branch passes 193 local pytest tests, 82% branch coverage, Ruff, Python compilation, and diff checks; the Flask page was smoke-tested in the in-app browser at 1280x900 desktop and 390x844 mobile with no current console errors. Remote `main` is at `86359d5` with successful CI run [33418693705](https://github.com/icecold009/Audio-Recognition/actions/runs/33418693705) for the merged baseline. No live demo URL, complete real-world benchmark, or credentialed provider result is currently available.
 
 ## Problem and audience
 
@@ -65,6 +65,7 @@ The benchmark runner requires 30 source tracks, one 4-, 8-, and 15-second microp
 
 - Flask `web/` is the single supported browser application.
 - The browser supports a microphone-first CTA, upload, waveform visualization, expandable runtime details, structured match/error/retry states, light/dark theme, focus-aware song details, and optional session-only history.
+- The presentation uses Space Grotesk for display headings, Manrope for body and interface copy, and IBM Plex Mono for runtime metadata, with shared responsive `clamp()` sizing and a consistent label-to-heading-to-copy rhythm.
 - Web uploads support WAV, MP3, M4A, AAC, OGG, FLAC, and WEBM; FFmpeg conversion is bounded by duration and output-size limits.
 - The current feature branch adds the browser presentation slice on top of the merged audio-pipeline, production-safety, benchmark-tooling, and documentation baseline.
 - CI runs Python tests on 3.10, 3.11, and 3.12, Ruff formatting/lint, branch coverage, dependency auditing, secret scanning, Render Blueprint validation, and a production-container smoke path.
@@ -80,10 +81,10 @@ The benchmark runner requires 30 source tracks, one 4-, 8-, and 15-second microp
 
 ### Verified locally on the current showcase feature branch
 
-- `.venv-pipeline\Scripts\python.exe -m coverage run --branch --source=shazam_project,web,scripts -m pytest -q` completed with `193 passed in 12.23s`; the initial non-elevated launcher failed before test collection because it could not create the configured Python process.
+- `.venv-pipeline\Scripts\python.exe -m coverage run --branch --source=shazam_project,web,scripts -m pytest -q` completed with `193 passed in 9.62s`; the initial non-elevated launcher failed before test collection because it could not create the configured Python process.
 - The coverage gate reported `82%` branch coverage, Ruff lint and formatting passed, Python compilation passed, and `git diff --check` produced no output.
 - A local development HTTP smoke returned 200 for `/` and `/healthz`, exposed upload and record controls, returned non-secret `/api/status`, returned the stable `invalid_audio` response for a malformed upload, and returned `/readyz` 503 because no recognition backend is configured.
-- In-app browser smoke verified the page identity, meaningful first viewport, empty-upload recovery card, runtime-details disclosure, theme toggle, no horizontal overflow at 390px and 320px, and no current console errors. Microphone permission was not requested.
+- In-app browser smoke verified the page identity, meaningful 1280x900 desktop and 390x844 mobile views, consistent type hierarchy and spacing, empty-upload recovery card, runtime-details disclosure, theme toggle, no horizontal overflow, and no current console errors. Microphone permission was not requested.
 - `sounddevice.query_devices()` listed 33 host devices, including input and output devices. No microphone recording or provider call was made.
 
 ### Verified remotely on merged `main`
@@ -95,7 +96,7 @@ The merged [PR #8](https://github.com/icecold009/Audio-Recognition/pull/8) recor
 - The current feature branch has not been pushed, so its UI changes have no remote CI result yet; the successful remote run applies to the merged baseline at `86359d5`.
 - No complete real-world corpus has been recorded.
 - No credentialed provider comparison, recognition accuracy, p95 latency, catalog coverage, or live deployment smoke is claimed.
-- The in-app browser could not reach the elevated local listener, so no browser-engine/permission screenshot or real browser microphone capture is claimed. Source and mocked tests cover the recording fallback and cleanup paths.
+- No microphone permission or real recording was performed; the current browser evidence is local visual/interaction smoke only. Source and mocked tests cover the recording fallback and cleanup paths.
 
 ## Challenges and tradeoffs
 
@@ -112,7 +113,7 @@ The main lesson is that “it returned a song once” is not a useful quality cl
 1. Assemble and document the legal 30-source corpus and 90 clips per backend.
 2. Run the benchmark with reviewed credentials and publish generated results only after the completeness gate passes.
 3. Add browser-engine smoke coverage for recording, upload, permission denial, unsupported `MediaRecorder`, result states, and resource cleanup.
-4. Capture a clean screenshot set from the supported Flask app and attach commands/captions to each image.
+4. Export and commit a reproducible screenshot set from the supported Flask app once the browser capture artifact path is available; keep commands and captions attached to each image.
 5. Make the supported pipeline interpreter launch without elevation in the developer environment and run the full release gate on the current branch.
 6. Verify a deployed instance separately if a live URL becomes available.
 

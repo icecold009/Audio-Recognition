@@ -1,8 +1,8 @@
 # UI/UX Design Brief
 
-**Project:** Shazam Clone  
-**Version:** 1.0  
-**Date:** June 2026
+**Project:** DIY Shazam
+**Version:** 1.1 — current implementation reference
+**Date:** September 2026
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### Concept & Tone
 
-The Shazam clone should feel **modern, dark, and musical** — evoking the sensation of sound and discovery. The primary action (recognizing music) should be front-and-center circle shape, immediate, and tactile. The UI borrows from the aesthetic of music apps (Spotify, Apple Music) but stays minimal enough to not distract from the single-purpose experience.
+The app should feel **modern, warm, and musical** — evoking the sensation of sound and discovery without competing with the task. The primary action (recognizing music) is a front-and-center circular control that feels immediate and tactile. The visual language borrows the restraint of editorial tools and music apps while keeping the single-purpose experience clear.
 
 **Tone keywords:** Immersive · Minimal · Tactile · Fast
 
@@ -18,59 +18,59 @@ The Shazam clone should feel **modern, dark, and musical** — evoking the sensa
 
 ## Color Palette
 
-### Primary Dark Theme (default)
+### Primary Light Theme (default)
 
-The app defaults to **dark mode** as the primary theme, with light mode as an optional toggle.
+The app defaults to a warm light theme, with dark mode available through the theme toggle.
 
 ```css
 /* Backgrounds */
---color-bg:              #0d0d0f;   /* Near-black, deep dark */
---color-surface:         #13131a;   /* Card/panel background */
---color-surface-2:       #1a1a24;   /* Elevated card / modals */
---color-surface-offset:  #1f1f2e;   /* Input fields, secondary panels */
---color-divider:         #2a2a3a;   /* Subtle separators */
---color-border:          #2e2e42;   /* Form borders, card outlines */
+--color-bg:              #f4f1ea;   /* Warm paper */
+--color-surface:         #fbfaf7;   /* Card/panel background */
+--color-surface-2:       #ebe7df;   /* Elevated card / modals */
+--color-surface-offset:  #e4dfd6;   /* Input fields, secondary panels */
+--color-divider:         #d9d3ca;   /* Subtle separators */
+--color-border:          #c9c1b5;   /* Form borders, card outlines */
 
 /* Text */
---color-text:            #e8e8f0;   /* Primary — near-white, slight blue */
---color-text-muted:      #8888a0;   /* Secondary labels, metadata */
---color-text-faint:      #4a4a60;   /* Placeholder, disabled */
+--color-text:            #171817;   /* Primary graphite */
+--color-text-muted:      #6d6a64;   /* Secondary labels, metadata */
+--color-text-faint:      #9a948a;   /* Placeholder, disabled */
 
-/* Accent — Electric Blue/Cyan (Shazam signature) */
---color-primary:         #1da1f2;   /* Main interactive accent */
---color-primary-hover:   #0d8dd6;
---color-primary-active:  #0a72ad;
---color-primary-glow:    rgba(29,161,242,0.15);  /* Glow on mic button */
+/* Accent — coral */
+--color-primary:         #e35c43;   /* Main interactive accent */
+--color-primary-hover:   #c94b36;
+--color-primary-active:  #ad3d2d;
+--color-primary-glow:    rgba(227,92,67,0.14);  /* Glow on mic button */
 
 /* Result / Success */
---color-success:         #1db954;   /* Spotify green — matched state */
+--color-success:         #39715e;   /* Matched state */
 
 /* Error */
---color-error:           #e84040;   /* Mic denied, no match */
+--color-error:           #b14d42;   /* Mic denied, no match */
 
 /* Waveform colors */
---color-wave-1:          #1da1f2;   /* Active waveform bar */
---color-wave-2:          rgba(29,161,242,0.3);  /* Faded bars */
+--color-wave-1:          #e35c43;   /* Active waveform bar */
+--color-wave-2:          rgba(227,92,67,0.28);  /* Faded bars */
 ```
 
-### Light Theme (toggle)
+### Dark Theme (toggle)
 
 ```css
---color-bg:              #f5f5f8;
---color-surface:         #ffffff;
---color-surface-2:       #f0f0f5;
---color-surface-offset:  #e8e8f0;
---color-divider:         #d8d8e4;
---color-border:          #c8c8da;
---color-text:            #12121a;
---color-text-muted:      #5a5a72;
---color-text-faint:      #9090a8;
---color-primary:         #0d8dd6;
+--color-bg:              #101211;
+--color-surface:         #171918;
+--color-surface-2:       #202321;
+--color-surface-offset:  #252925;
+--color-divider:         #303530;
+--color-border:          #3a403a;
+--color-text:            #f1eee8;
+--color-text-muted:      #aaa79f;
+--color-text-faint:      #777a74;
+--color-primary:         #ff775d;
 ```
 
 ### Why This Palette?
 
-Blue-cyan is Shazam's signature color. Using deep near-black surfaces (not pure #000) prevents eye strain while maintaining drama. The electric blue accent on a near-black background creates strong contrast and a premium, music-app-native feel. Green is reserved exclusively for "match found" — users will immediately learn this visual language.
+Warm paper and graphite make the default state feel calm and tactile; coral supplies the moment of action without turning the page into a neon dashboard. The dark theme preserves the same hierarchy and accent relationships. Green remains reserved for a matched state so that recognition feedback stays distinct.
 
 ---
 
@@ -80,28 +80,30 @@ Blue-cyan is Shazam's signature color. Using deep near-black surfaces (not pure 
 
 | Role | Font | Weight | Source |
 |------|------|--------|--------|
-| **Display / Hero** | `Sora` | 700, 800 | Google Fonts |
-| **Body / UI** | `Inter` | 400, 500, 600 | Google Fonts |
-| **Monospace** (timestamps, metadata) | `JetBrains Mono` | 400 | Google Fonts |
+| **Display / Hero** | `Space Grotesk` | 500, 600, 700 | Google Fonts |
+| **Body / UI** | `Manrope` | 400, 500, 600, 700 | Google Fonts |
+| **Monospace** (timestamps, metadata) | `IBM Plex Mono` | 400, 500 | Google Fonts |
 
 **Load snippet:**
 ```html
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 ```
 
-**Rationale:** Sora is geometric and modern — it feels tech-forward without being cold. Inter is the best-in-class UI sans-serif for reading at small sizes. JetBrains Mono adds a technical/musical metadata feel to secondary info.
+**Rationale:** Space Grotesk gives the hero and section headings a compact editorial voice. Manrope keeps supporting copy and controls readable, while IBM Plex Mono makes runtime metadata feel instrument-like and easy to scan.
 
-### Type Scale (web app — capped at `--text-xl`)
+### Type Scale (web app — responsive and shared)
 
 ```css
---text-xs:    clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);   /* 12–14px: timestamps */
---text-sm:    clamp(0.875rem, 0.8rem + 0.35vw, 1rem);       /* 14–16px: buttons, nav */
---text-base:  clamp(1rem, 0.95rem + 0.25vw, 1.125rem);      /* 16–18px: body */
---text-lg:    clamp(1.125rem, 1rem + 0.75vw, 1.5rem);       /* 18–24px: section headings */
---text-xl:    clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);      /* 24–36px: page title MAX */
+--text-display: clamp(4rem, 8.6vw, 7.4rem);      /* hero display */
+--text-section:  clamp(2.2rem, 4vw, 3.7rem);     /* result section */
+--text-body:     clamp(0.98rem, 1.15vw, 1.12rem);  /* body and UI copy */
+--text-support:  clamp(0.82rem, 0.8rem + 0.15vw, 0.95rem);
+--text-meta:     0.66rem;                         /* runtime metadata */
 ```
+
+The implemented rhythm uses a shared 18px label-to-heading gap, a responsive 20–28px heading-to-copy gap, and a responsive 48–76px copy-to-status gap. The full overrides live in [`web/static/typography.css`](../web/static/typography.css), so the type system can be reviewed independently from the larger legacy stylesheet.
 
 ---
 
@@ -199,9 +201,9 @@ CSS:
 ```
 ┌────────────────────────────────────────────┐
 │  ┌──────────┐                              │
-│  │          │  Blinding Lights             │  ← --text-lg, Sora 700
-│  │ Album    │  The Weeknd                  │  ← --text-base, Inter 500
-│  │ Art      │  After Hours · 2019 · Pop    │  ← --text-sm, text-muted
+│  │          │  Blinding Lights             │  ← Space Grotesk, card title
+│  │ Album    │  The Weeknd                  │  ← Manrope, supporting copy
+│  │ Art      │  After Hours · 2019 · Pop    │  ← IBM Plex Mono, metadata
 │  │ 80×80px  │                              │
 │  └──────────┘                              │
 │                                            │

@@ -97,7 +97,7 @@ missing lawful corpus, credentials, or real benchmark execution.
 - [x] Mark unsupported Supabase/auth/history/RLS/account/settings claims as planned or remove them.
 - [x] Reconcile README content with the actual Flask source tree.
 - [x] Reconcile documented 8-second CLI, 5-second RapidAPI trim, and 10-second browser-recording behavior.
-- [ ] Document the exact source and command for each screenshot, and add failure-state screenshots where useful.
+- [ ] Document the exact source and command for each committed screenshot, and add failure-state screenshots where useful; the current 1280x900 and 390x844 visual review remains local-only.
 - [x] Remove unsupported platform claims and document API statuses, backend order, environment variables, and security boundaries.
 - [ ] Tick Main task 7 only after documentation describes shipped behavior rather than aspiration.
 
@@ -237,7 +237,7 @@ missing lawful corpus, credentials, or real benchmark execution.
 - [x] Reconcile the documented 8-second CLI behavior, 5-second RapidAPI trim, and 10-second browser recording behavior.
 - [x] Document that the current FFT is diagnostic and not used for matching.
 - [x] Replace the stale README “Add CI” roadmap entry with the implemented pytest, coverage, lint, and build gates.
-- [ ] Document the exact source and command used to generate each screenshot.
+- [ ] Document the exact source and command used to generate each committed screenshot; the current 1280x900 and 390x844 visual review remains local-only.
 - [ ] Add screenshots or recordings for no-match, provider error, permission denial, rate limiting, and upload failure states.
 - [x] Add a concise README Limitations section covering noise, catalog coverage, language/region differences, and live/cover/remix versions.
 - [x] Remove unsupported “platforms tested” claims and state that cross-platform support is not independently verified.
@@ -273,6 +273,7 @@ Record evidence here as work lands:
 
 | Date | Task/check | Evidence | Result |
 |---|---|---|---|
+| 2026-09-14 | Typography consistency and visual review | Feature branch `codex/showcase-ready-20260913`; local Flask browser review at 1280x900 and 390x844; verified Space Grotesk / Manrope / IBM Plex Mono roles, shared responsive type tokens, aligned spacing, runtime details, empty-upload recovery, theme toggle, no overflow, and no console warnings/errors. | Showcase documentation synced to the current interface. Local visual captures were reviewed but no binary screenshot assets were committed; provider credentials, real recording, benchmark corpus, and live deployment remain open. |
 | 2026-09-13 | Showcase-ready browser polish | Feature branch `codex/showcase-ready-20260913`; local Flask browser smoke verified first viewport, theme toggle, runtime-details disclosure, empty-upload recovery, no horizontal overflow at 390px/320px, and no current console errors. | Microphone-first CTA, structured result/error cards, focus-aware details modal, safe external links, and current/roadmap documentation boundary added. Provider credentials, real recording, benchmark corpus, and live deployment remain open. |
 | 2026-08-17 | Current checkout audit and documentation reconciliation | Dedicated branch `codex/audio-recognition-p0-audit`; supported `.venv-pipeline` ran 193 tests; FFmpeg and fpcalc were available; local browser smoke checked page load, status rendering, and unsupported-upload handling; `/readyz`/quota/WSGI behavior is covered by repository tests. | Production/configuration and documentation checkboxes updated. No provider values, source catalog, microphone clips, benchmark results, or credentialed smoke evidence are present locally, so the real benchmark and release gates remain open. |
 | 2026-08-01 | Production rate limits | Added `production_rate_limits` migration through the Supabase CLI; private row-locked quota RPC, RLS with no public policies, server-only service-role access, HMAC client identifiers, fail-closed 503 handling, development fallback, trusted-proxy configuration, direct API-secret authentication, and Retry-After responses. | 93 tests passed; 68% total branch coverage; compileall and diff checks passed. Local/linked SQL execution remains unavailable: Docker is not running and the linked `shazam-project` is inactive; linked advisors returned no lints and migration listing timed out. |

@@ -1,6 +1,6 @@
 # DIY Shazam — presentation outline
 
-**Status:** Source-verified showcase draft. The repository is a locally validated prototype, not a verified live production demo. The current browser polish is on feature branch `codex/showcase-ready-20260913`; local pytest (193), 82% branch coverage, Ruff, compile, diff, and in-app browser smoke checks passed. Remote CI evidence applies to the merged baseline at `86359d5`; this feature branch is not pushed.
+**Status:** Source-verified showcase draft. The repository is a locally validated prototype, not a verified live production demo. The current browser presentation and typography refinement are complete on feature branch `codex/showcase-ready-20260913`; local pytest (193), 82% branch coverage, Ruff, compile, diff, and in-app browser smoke checks passed. Remote CI evidence applies to the merged baseline at `86359d5`; this feature branch is not pushed.
 
 **Audience:** General portfolio audience
 
@@ -8,7 +8,7 @@
 
 **Length:** 7 slides, approximately 2 minutes spoken
 
-**Live demo:** None supplied; local browser screenshots were reviewed during verification but are not committed as showcase assets.
+**Live demo:** None supplied; fresh local browser captures at 1280x900 and 390x844 were reviewed during verification but are not committed as showcase assets.
 
 ## Slide 1 — DIY Shazam
 
@@ -20,7 +20,7 @@
 - Flask browser UI plus CLI entry point
 - RapidAPI/Shazam, AcoustID, AudD, and local fingerprint backends
 
-**Recommended visual:** A real local screenshot of the Flask home screen showing the microphone-first CTA, concise runtime status, and upload alternative. Keep it labeled as local evidence; use `docs/screenshots/fft-output.png` only as a technical fallback, labeled as a diagnostic spectrum rather than a product screenshot.
+**Recommended visual:** A real local screenshot of the Flask home screen showing the warm paper / graphite / coral palette, Space Grotesk display type, mono runtime metadata, microphone-first CTA, concise runtime status, and upload alternative. Keep it labeled as local evidence; use `docs/screenshots/fft-output.png` only as a technical fallback, labeled as a diagnostic spectrum rather than a product screenshot.
 
 **Speaker notes:** “This is DIY Shazam: a song-recognition project built around a practical input pipeline and several interchangeable backends. The interesting part is not just calling an API; it is making microphone input, uploaded files, validation, fallback, and safe failure states behave consistently.”
 
