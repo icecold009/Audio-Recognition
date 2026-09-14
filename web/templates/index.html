@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 
 <head>
     <meta charset="utf-8" />
@@ -32,7 +32,9 @@
                 </div>
             </div>
 
-            <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to light mode" title="Toggle theme">
+            <div class="header-utilities">
+                <span class="environment-label"><span class="environment-dot" aria-hidden="true"></span> Local lab</span>
+                <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark mode" title="Toggle theme">
                 <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5" />
@@ -49,15 +51,16 @@
                     stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
-            </button>
+                </button>
+            </div>
         </header>
 
         <main>
             <div class="hero">
                 <div class="hero-copy">
-                    <p class="eyebrow">Private by default · built to be inspected</p>
-                    <h1 class="page-title">Identify any song.</h1>
-                    <p class="page-subtitle">Listen from your microphone or drop in a short clip. One bounded audio pipeline keeps every backend honest.</p>
+                    <p class="eyebrow">01 · Listening room</p>
+                    <h1 class="page-title">Find the song behind the sound.</h1>
+                    <p class="page-subtitle">A quiet, private place to identify a moment of audio. Start live, or bring a short clip.</p>
                 </div>
 
                 <div class="status-card" id="status" role="status" aria-live="polite" aria-label="Server status">
@@ -72,30 +75,35 @@
                 <section class="panel cta-shell" id="recognition" aria-labelledby="recognition-heading">
                     <div class="capture-layout">
                         <div class="capture-primary">
-                            <p class="section-label" id="recognition-heading">Start with your microphone</p>
+                            <div class="station-topline">
+                                <p class="section-label" id="recognition-heading">Listen live</p>
+                                <span class="station-limit">10 sec window</span>
+                            </div>
                             <button id="recBtn" class="record-button" type="button" aria-label="Identify song" aria-pressed="false">
                                 <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1.5 13.93A7.001 7.001 0 0 1 5 8H3a9 9 0 0 0 8 8.94V20H8v2h8v-2h-3v-3.06A9 9 0 0 0 21 8h-2a7 7 0 0 1-5.5 6.93z" />
                                 </svg>
                                 <span id="recBtnLabel" class="sr-only">Start Recording</span>
                             </button>
-                            <p class="capture-hint" id="captureHint" aria-live="polite">Tap the microphone to listen for up to 10 seconds.</p>
-                            <button id="stopBtn" class="secondary-button" type="button" disabled>Stop recording</button>
+                            <p class="record-prompt">Tap to identify</p>
+                            <p class="capture-hint" id="captureHint" aria-live="polite">The microphone listens for up to 10 seconds.</p>
+                            <button id="stopBtn" class="secondary-button" type="button" disabled>Stop capture</button>
                         </div>
 
                         <div class="capture-divider" aria-hidden="true"><span>or use an audio file</span></div>
 
                         <div class="upload-field">
-                            <label for="fileInput">Choose an audio clip</label>
+                            <p class="upload-kicker">Have a clip already?</p>
+                            <label for="fileInput">Drop in an audio clip</label>
                             <div class="upload-row">
                                 <input id="fileInput" type="file" accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/flac,audio/webm" />
                                 <button id="uploadBtn" type="button">Upload &amp; match</button>
                             </div>
-                            <p class="field-help">WAV, MP3, M4A, AAC, OGG, FLAC, or WEBM · up to 30 seconds</p>
+                            <p class="field-help">WAV, MP3, M4A, AAC, OGG, FLAC, or WEBM<br />Up to 30 seconds · 10 MiB max</p>
                         </div>
 
                         <div class="waveform-wrap">
-                            <div class="waveform-label">Live input</div>
+                            <div class="waveform-label"><span class="waveform-pulse" aria-hidden="true"></span>Signal monitor</div>
                             <div class="waveform" role="img" aria-label="Idle waveform visualizer">
                                 <span class="wave-bar" data-wave-bar></span>
                                 <span class="wave-bar" data-wave-bar></span>
@@ -129,7 +137,7 @@
             <section class="stack result-section" aria-labelledby="result-heading" role="region">
                 <div class="section-heading-row">
                     <div>
-                        <p class="eyebrow">Your latest signal</p>
+                        <p class="eyebrow">02 · Your latest signal</p>
                         <h2 class="section-heading" id="result-heading">Recognition result</h2>
                     </div>
                     <span class="section-note">Session-only history</span>
@@ -139,9 +147,9 @@
         </main>
 
         <footer class="site-footer">
-            <p class="footer-name">DIY Shazam · Made by Shaurya Saria</p>
+            <p class="footer-name">DIY Shazam <span>·</span> Made by Shaurya Saria</p>
             <p class="footer-bio">
-                A transparent audio-recognition experiment with bounded inputs, fallback backends, and honest evaluation gates.
+                A private audio-recognition experiment with bounded inputs, fallback backends, and honest evaluation gates.
             </p>
         </footer>
     </div>
