@@ -12,11 +12,13 @@ Validated audio pipeline · Multi-backend matching · Flask web UI · Terminal o
 ***
 <div align="center">
   <h1 style="margin:0;padding:0">Audio Recognition</h1>
-  <p style="margin:4px 0 8px;color:#1E90FF">Identify songs from your microphone or an audio file with validated multi-backend matching</p>
+  <p style="margin:4px 0 8px;color:#e35c43">Identify songs from your microphone or an audio file with validated multi-backend matching</p>
 </div>
 
 ## Overview
 DIY Shazam captures audio from the CLI microphone/file path or the Flask browser UI, normalizes it through one bounded audio pipeline, and identifies tracks using RapidAPI/Shazam, AcoustID, AudD, or local spectrogram peaks and constellation hash pairs. FFT output is a diagnostic visualization only; it is not the recognition algorithm. Flask serves the complete browser UI and JSON API from one origin.
+
+The supported web experience is a focused, local-first showcase MVP: a microphone-first recognition flow, a supported upload path, readable runtime diagnostics, recovery-oriented result states, and optional session-only history. Authentication, persistent history, a public deployment, and real-world accuracy claims remain explicit follow-on work rather than implied features.
 
 ## Implemented
 
@@ -24,6 +26,7 @@ DIY Shazam captures audio from the CLI microphone/file path or the Flask browser
 - CLI and web inputs use the documented bounded normalization pipeline. The CLI accepts WAV/PCM; the web path converts the documented browser upload formats through FFmpeg.
 - Provider dispatch uses RapidAPI/Shazam, AcoustID, AudD, and the local constellation-hash backend with stable public statuses and safe diagnostics.
 - Production configuration includes Gunicorn, `/healthz`, `/readyz`, bounded uploads and FFmpeg work, atomic Supabase quota operations, trusted-proxy controls, and debug-off defaults outside explicit development mode.
+- The browser surface uses an accessible microphone-first CTA, expandable runtime details, structured match/error cards, safe external links, theme persistence, and focus-aware song details.
 - The current checkout has 193 passing Python tests. CI also defines Ruff, coverage, dependency-audit, and secret-scanning gates.
 
 ## Known limitations
@@ -43,7 +46,7 @@ Supabase authentication, persistent user history, RLS-backed history, account de
 
 - Reproducible benchmark entry points are documented in [`evaluation/README.md`](evaluation/README.md), but no complete result is present in this checkout.
 - The committed FFT image at [`docs/screenshots/fft-output.png`](docs/screenshots/fft-output.png) is diagnostic output from `shazam_project.fft_analyze.analyze_audio`; the original capture command was not preserved in Git. Recreate it through the CLI's `python main.py` path after choosing `mic` or `file`.
-- The current browser smoke check was run against `python web/app.py` on a local development port with debug disabled. It verified page load, status rendering, and the unsupported-upload error state; it did not use provider credentials or record microphone audio.
+- The current browser smoke check was run against `python web/app.py` on a local development port with debug disabled. It verified page load, status rendering, the runtime-details disclosure, empty-upload recovery, theme switching, and the responsive visual hierarchy at 1280x900 and 390x844; it did not use provider credentials or record microphone audio.
 
 ## Performance
 
@@ -75,10 +78,10 @@ flowchart LR
   F -->|Local hashes| J[Peak/hash index]
   G & H & I & J --> K[Normalized Result]
   K --> L[Display (CLI) / JSON (Web)]
-  classDef blue fill:#ffffff,stroke:#1E90FF,stroke-width:2px,color:#1E90FF;
-  class A,B,C,D,E,F,G,H,I,J,K,L blue;
+  classDef accent fill:#fbfaf7,stroke:#e35c43,stroke-width:2px,color:#171817;
+  class A,B,C,D,E,F,G,H,I,J,K,L accent;
 ```
-Theme: black / white / blue — white nodes with a professional DodgerBlue accent (#1E90FF). The browser UI is served directly by Flask; there is no separate browser bundle.
+Theme: warm paper / graphite / coral, with an optional dark mode. The browser UI is served directly by Flask; there is no separate browser bundle.
 
 ## Quickstart
 ### Windows PowerShell
@@ -181,7 +184,9 @@ Entrypoints remain:
 Supported env vars (see `shazam_project.config.load_config()`): `AUDD_API_TOKEN`, `ACOUSTID_API_KEY`, `FP_CALC_PATH`, `RAPIDAPI_KEY`, and optional `LOCAL_FINGERPRINT_INDEX` (with `FINGERPRINT_INDEX_PATH` accepted as a legacy alias). The shared audio contract is controlled by `INTERNAL_SAMPLE_RATE`, `MIN_AUDIO_SECONDS`, `MAX_AUDIO_SECONDS`, `MAX_UPLOAD_BYTES`, and `FFMPEG_TIMEOUT_SECONDS`; provider WAVs are always fixed 16-bit PCM. Matcher order is RapidAPI → AcoustID → AudD → local fingerprint index.
 
 ## Web UI
-`python web/app.py` serves `/`, `/static/*`, `/api/match`, and `/api/status` from the same origin. CLI file mode accepts WAV/PCM files. Web uploads support WAV, MP3, M4A, AAC, OGG, FLAC, and WEBM; non-WAV web uploads require FFmpeg on `PATH` and are converted before decoding. The browser also supports microphone recording, manual stop, waveform visualization, loading/error/no-match states, light/dark theme persistence, and session-only recognition history.
+`python web/app.py` serves `/`, `/static/*`, `/api/match`, and `/api/status` from the same origin. CLI file mode accepts WAV/PCM files. Web uploads support WAV, MP3, M4A, AAC, OGG, FLAC, and WEBM; non-WAV web uploads require FFmpeg on `PATH` and are converted before decoding. The browser also supports a microphone-first recording flow, manual stop, waveform visualization, expandable capability details, structured loading/error/no-match/match states, light/dark theme persistence, focus-aware song details, and session-only recognition history.
+
+The current showcase presentation uses Space Grotesk for display headings, Manrope for body and interface copy, and IBM Plex Mono for runtime metadata. Responsive `clamp()` sizing, a small shared type scale, and a consistent label-to-heading-to-copy rhythm keep the editorial layout coherent from the 1280x900 desktop view to the 390x844 mobile view. The warm paper, graphite, and coral palette is implemented in `web/static/style.css`, with the typography refinements isolated in [`web/static/typography.css`](web/static/typography.css).
 
 The durations are intentionally different by path: CLI microphone mode defaults to 8 seconds and accepts an interactive override; the RapidAPI/Shazam adapter sends at most the first 5 seconds of the normalized clip; browser recording auto-stops after 10 seconds but can be stopped manually; and the reproducible benchmark uses separate 4-second, 8-second, and 15-second microphone clips.
 

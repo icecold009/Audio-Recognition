@@ -35,6 +35,10 @@ class WebRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"DIY Shazam", response.data)
         self.assertIn(b"/static/app.js", response.data)
+        self.assertIn(b'class="record-button"', response.data)
+        self.assertIn(b'id="statusMessage"', response.data)
+        self.assertIn(b'id="statusDetails"', response.data)
+        self.assertIn(b'aria-live="polite"', response.data)
 
     def test_static_assets_are_served_by_flask(self):
         response = self.client.get("/static/style.css")
@@ -47,6 +51,8 @@ class WebRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"quota_mode", response.data)
+        self.assertIn(b"renderResultMessage", response.data)
+        self.assertIn(b"safeStreamingLink", response.data)
         self.assertNotIn(b"daily_used", response.data)
         self.assertNotIn(b"monthly_used", response.data)
 

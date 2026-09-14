@@ -5,11 +5,13 @@
 **Date:** June 2026  
 **Database:** Supabase (PostgreSQL)
 
+> Status: Design-only roadmap. The current Flask showcase does not implement Supabase Auth, `profiles`, `recognition_history`, protected user routes, or account deletion. The shipped Supabase migration is limited to server-side quota accounting; session history remains in the browser and is optional.
+
 ---
 
 ## Overview
 
-All user data is stored in Supabase PostgreSQL. Authentication is handled by Supabase Auth (`auth.users` table — managed automatically). The application uses two custom tables in the `public` schema: `profiles` and `recognition_history`. Row-Level Security (RLS) is enabled on all custom tables.
+The intended authenticated product would store user data in Supabase PostgreSQL. Authentication would be handled by Supabase Auth (`auth.users` table — managed automatically), with `profiles` and `recognition_history` protected by Row-Level Security (RLS). These tables and flows are retained here as a future design and are not part of the current showcase runtime.
 
 ---
 
@@ -214,7 +216,7 @@ Test the schema with an anon key and no session to confirm that:
 
 ---
 
-## API Data Flow
+## Planned authenticated API data flow
 
 ### Saving a recognized song
 

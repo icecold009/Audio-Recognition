@@ -1,0 +1,199 @@
+:root {
+    --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+    --font-body: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --text-display: clamp(3.5rem, 7.6vw, 6.5rem);
+    --text-section: clamp(2rem, 3.4vw, 3.25rem);
+    --text-feature: clamp(1.15rem, 1.65vw, 1.45rem);
+    --text-body: clamp(0.98rem, 1.15vw, 1.12rem);
+    --text-support: clamp(0.82rem, 0.8rem + 0.15vw, 0.95rem);
+    --text-action: clamp(0.8rem, 0.76rem + 0.1vw, 0.9rem);
+    --text-meta: clamp(0.7rem, 0.68rem + 0.1vw, 0.78rem);
+    --tracking-display: -0.08em;
+    --tracking-meta: 0.1em;
+    --space-label-heading: 1.125rem;
+    --space-heading-copy: clamp(1.25rem, 2vw, 1.75rem);
+    --space-copy-status: clamp(3rem, 7vw, 4.75rem);
+}
+
+body {
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.6;
+}
+
+#themeToggle {
+    padding: 0;
+}
+
+.page-title,
+.section-heading,
+.app-logo-name,
+.upload-field label,
+.record-prompt,
+.footer-name,
+.match-title,
+.detail-modal h2 {
+    font-family: var(--font-display);
+}
+
+.brand-tagline,
+.environment-label,
+.eyebrow,
+.section-label,
+.upload-kicker,
+.station-limit,
+.waveform-label,
+.field-help,
+.section-note,
+.footer-bio,
+.capture-divider span,
+.match-label,
+.status-message,
+.status-detail-row,
+.text-button {
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: var(--tracking-meta);
+    line-height: 1.4;
+}
+
+.hero-copy {
+    max-width: 900px;
+    padding-left: 0;
+}
+
+.eyebrow {
+    margin-left: 0;
+}
+
+.page-title {
+    max-width: 9ch;
+    margin-top: var(--space-label-heading);
+    font-size: var(--text-display);
+    letter-spacing: var(--tracking-display);
+    line-height: 0.93;
+}
+
+.page-subtitle {
+    max-width: 42ch;
+    margin-left: clamp(12px, 3vw, 42px);
+    margin-top: var(--space-heading-copy);
+    font-size: var(--text-body);
+    line-height: 1.6;
+}
+
+.status-card {
+    margin-top: var(--space-copy-status);
+    margin-left: 0;
+}
+
+.section-heading-row {
+    align-items: end;
+}
+
+.section-heading-row > div {
+    gap: var(--space-label-heading);
+}
+
+.section-heading {
+    max-width: 12ch;
+    font-size: var(--text-section);
+    letter-spacing: var(--tracking-display);
+    line-height: 0.98;
+}
+
+.section-note {
+    margin-bottom: 0.48rem;
+}
+
+.upload-field label {
+    font-size: var(--text-feature);
+    letter-spacing: -0.065em;
+    line-height: 1.1;
+}
+
+.record-prompt {
+    font-size: var(--text-body);
+    letter-spacing: -0.035em;
+}
+
+.record-button svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.match-title {
+    font-size: var(--text-feature);
+    letter-spacing: -0.055em;
+    line-height: 1.1;
+}
+
+.match-artist,
+.match-album {
+    font-family: var(--font-body);
+    font-size: var(--text-support);
+    line-height: 1.45;
+}
+
+.capture-hint,
+.toggle-copy,
+.settings-note,
+.history-artist,
+.history-time {
+    font-size: var(--text-support);
+    line-height: 1.5;
+}
+
+.secondary-button,
+.button-secondary,
+.button-link,
+#uploadBtn,
+input[type='file']::file-selector-button {
+    font-size: var(--text-action);
+    line-height: 1.25;
+}
+
+.footer-name {
+    font-size: var(--text-action);
+    letter-spacing: -0.035em;
+}
+
+.detail-modal h2 {
+    font-size: var(--text-feature);
+    line-height: 1.1;
+}
+
+.status-message,
+.status-detail-row,
+.text-button {
+    font-size: var(--text-meta);
+    line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+    .hero-copy {
+        padding-left: 0;
+    }
+
+    .eyebrow,
+    .status-card {
+        margin-left: 0;
+    }
+
+    .page-title {
+        max-width: 8.5ch;
+        font-size: clamp(3.1rem, 13.4vw, 4.2rem);
+    }
+
+    .page-subtitle {
+        margin-left: 0;
+    }
+
+    .section-heading {
+        font-size: clamp(1.9rem, 8.5vw, 2.8rem);
+    }
+}
