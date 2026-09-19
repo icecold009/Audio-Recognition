@@ -69,8 +69,8 @@ The showcase diagram is generated from the public repository's default `main` br
 [GitDiagram](https://gitdiagram.com/icecold009/Audio-Recognition). The exported assets are
 [`docs/architecture/audio-recognition.png`](docs/architecture/audio-recognition.png) and
 [`docs/architecture/audio-recognition.mmd`](docs/architecture/audio-recognition.mmd). The PNG
-is a structural overview, not evidence of recognition accuracy, provider availability, or a
-deployed service.
+uses GitDiagram's dark mode and is a structural overview, not evidence of recognition accuracy,
+provider availability, or a deployed service.
 
 ![DIY Shazam audio-recognition pipeline](docs/architecture/audio-recognition.png)
 
@@ -100,7 +100,9 @@ turn CI test counts into recognition-accuracy results. A lawful benchmark corpus
 provider smoke test, browser/device capture evidence, and public deployment remain separate gates
 and are not implied by this diagram.
 
-Theme: warm paper / graphite / coral, with an optional dark mode. The browser UI is served directly by Flask; there is no separate browser bundle.
+The browser UI is served directly by Flask; there is no separate browser bundle. The application
+keeps its warm paper / graphite / coral interface palette, while this showcase diagram uses a
+dark GitDiagram presentation for contrast.
 
 ## Quickstart
 ### Windows PowerShell
