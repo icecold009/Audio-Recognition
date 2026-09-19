@@ -65,23 +65,44 @@ No complete real-world benchmark has been imported. Run the documented evaluatio
 <!-- BENCHMARK_RESULTS:END -->
 
 ## Architecture
-```mermaid
-flowchart LR
-  A[CLI / Flask Browser UI] --> B[Audio Input\n(mic or upload)]
-  B --> C[Validate and normalize\nmono float32 / internal rate]
-  C --> D[FFT diagnostic only]
-  C --> E[Write 16-bit PCM WAV temp]
-  E --> F{Matcher Backends}
-  F -->|RapidAPI| G[Shazam]
-  F -->|AcoustID| H[AcoustID]
-  F -->|AudD| I[AudD]
-  F -->|Local hashes| J[Peak/hash index]
-  G & H & I & J --> K[Normalized Result]
-  K --> L[Display (CLI) / JSON (Web)]
-  classDef accent fill:#fbfaf7,stroke:#e35c43,stroke-width:2px,color:#171817;
-  class A,B,C,D,E,F,G,H,I,J,K,L accent;
-```
-Theme: warm paper / graphite / coral, with an optional dark mode. The browser UI is served directly by Flask; there is no separate browser bundle.
+The showcase diagram is generated from the public repository's default `main` branch with
+[GitDiagram](https://gitdiagram.com/icecold009/Audio-Recognition). The exported assets are
+[`docs/architecture/audio-recognition.png`](docs/architecture/audio-recognition.png) and
+[`docs/architecture/audio-recognition.mmd`](docs/architecture/audio-recognition.mmd). The PNG
+uses GitDiagram's dark mode and is a structural overview, not evidence of recognition accuracy,
+provider availability, or a deployed service.
+
+![DIY Shazam audio-recognition pipeline](docs/architecture/audio-recognition.png)
+
+The path represented by the diagram is:
+
+- **Input and validation:** `main.py` is the interactive CLI entry point; `web/app.py` serves
+  the Flask page and `/api/match` upload route. Both feed the bounded audio contract.
+- **Shared audio contract:** inputs are validated, downmixed to mono `float32` samples in
+  `[-1, 1]`, and resampled to 44.1 kHz by default. Provider adapters receive temporary mono
+  16-bit PCM WAV files. FFT output is an optional diagnostic and is not the matcher.
+- **Fingerprint and matching:** the local backend extracts spectral peaks, creates constellation
+  hash pairs, and searches a configured fingerprint index. This is deterministic local matching
+  when an index is present; it is not a measured accuracy claim.
+- **Provider boundary:** RapidAPI/Shazam, AcoustID via `fpcalc`, and AudD are optional adapters
+  selected by configuration and attempted in the documented fallback order. Missing credentials
+  or tools produce `not_configured`; no provider is labelled active by the diagram alone.
+- **Result/report:** the shared public terminal statuses are `matched`, `no_match`,
+  `not_configured`, `invalid_audio`, `rate_limited`, and `error`. The CLI renders a terminal
+  report; Flask returns the normalized JSON contract and browser result state.
+
+The linked source files and tests are the review path for the diagram: [`main.py`](main.py),
+[`web/app.py`](web/app.py), [`recorder.py`](shazam_project/recorder.py),
+[`fingerprint.py`](shazam_project/fingerprint.py), [`matcher.py`](shazam_project/matcher.py),
+[`config.py`](shazam_project/config.py), and [`tests/`](tests/). The existing test suite and CI
+gates exercise mocked providers, validation, fallback, routes, and failure states; they do not
+turn CI test counts into recognition-accuracy results. A lawful benchmark corpus, credentialed
+provider smoke test, browser/device capture evidence, and public deployment remain separate gates
+and are not implied by this diagram.
+
+The browser UI is served directly by Flask; there is no separate browser bundle. The application
+keeps its warm paper / graphite / coral interface palette, while this showcase diagram uses a
+dark GitDiagram presentation for contrast.
 
 ## Quickstart
 ### Windows PowerShell

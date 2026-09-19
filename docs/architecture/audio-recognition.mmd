@@ -1,0 +1,83 @@
+flowchart LR
+  subgraph Entry["Entry surfaces"]
+    CLI["CLI · main.py"]
+    WEB["Flask web · web/app.py<br/>/ · /api/match · /api/status"]
+    MIC["Microphone"]
+    FILE["Audio file / upload"]
+    MIC --> CLI
+    FILE --> CLI
+    MIC --> WEB
+    FILE --> WEB
+  end
+
+  subgraph Contract["Shared audio contract"]
+    VALIDATE["Validate bounded input<br/>size · duration · encoding"]
+    NORMALIZE["Mono float32 [-1, 1]<br/>44.1 kHz"]
+    TEMPWAV["Optional provider temp file<br/>mono 16-bit PCM WAV"]
+    DIAG["Optional FFT diagnostic<br/>not the matcher"]
+    VALIDATE --> NORMALIZE
+    NORMALIZE --> TEMPWAV
+    NORMALIZE -.-> DIAG
+  end
+
+  subgraph Matching["Fingerprint / matching"]
+    DISPATCH["Matcher dispatcher<br/>fallback order"]
+    LOCAL["Deterministic local matcher<br/>spectral peaks → constellation hash pairs<br/>fingerprint index"]
+    CONFIG["Runtime configuration<br/>credentials · tools · index"]
+    PROVIDERS["Optional provider adapters<br/>only when configured"]
+    SHAZAM["RapidAPI / Shazam"]
+    ACOUSTID["AcoustID + fpcalc"]
+    AUDD["AudD"]
+    CONFIG --> PROVIDERS
+    DISPATCH --> LOCAL
+    DISPATCH --> PROVIDERS
+    PROVIDERS --> SHAZAM
+    PROVIDERS --> ACOUSTID
+    PROVIDERS --> AUDD
+  end
+
+  subgraph Output["Result / report"]
+    RESULT["Normalized result/report<br/>CLI display or JSON/browser card"]
+    MATCHED(["matched"])
+    NO_MATCH(["no_match"])
+    NOT_CONFIGURED(["not_configured"])
+    INVALID(["invalid_audio"])
+    RATE_LIMITED(["rate_limited"])
+    ERROR(["error"])
+    RESULT --> MATCHED
+    RESULT --> NO_MATCH
+    RESULT --> NOT_CONFIGURED
+    RESULT --> INVALID
+    RESULT --> RATE_LIMITED
+    RESULT --> ERROR
+  end
+
+  CLI --> VALIDATE
+  WEB --> VALIDATE
+  NORMALIZE --> DISPATCH
+  LOCAL --> RESULT
+  SHAZAM --> RESULT
+  ACOUSTID --> RESULT
+  AUDD --> RESULT
+  VALIDATE -->|reject| INVALID
+  CONFIG -. missing credentials/tool .-> NOT_CONFIGURED
+  WEB -. quota denied .-> RATE_LIMITED
+  DISPATCH -. provider/local failure .-> ERROR
+
+  click CLI "https://github.com/icecold009/audio-recognition/blob/main/main.py" "CLI entry"
+  click WEB "https://github.com/icecold009/audio-recognition/blob/main/web/app.py" "Flask routes"
+  click VALIDATE "https://github.com/icecold009/audio-recognition/blob/main/shazam_project/recorder.py" "Audio validation"
+  click NORMALIZE "https://github.com/icecold009/audio-recognition/blob/main/shazam_project/recorder.py" "Audio normalization"
+  click DISPATCH "https://github.com/icecold009/audio-recognition/blob/main/shazam_project/matcher.py" "Matcher dispatcher"
+  click LOCAL "https://github.com/icecold009/audio-recognition/blob/main/shazam_project/fingerprint.py" "Local fingerprint matcher"
+  click PROVIDERS "https://github.com/icecold009/audio-recognition/blob/main/shazam_project/matcher.py" "Provider adapters"
+  click RESULT "https://github.com/icecold009/audio-recognition/tree/main/tests" "Contract and integration tests"
+
+  classDef entry fill:#192231,stroke:#6dd4e9,stroke-width:2px,color:#e8edf5;
+  classDef contract fill:#2c3544,stroke:#f4b860,stroke-width:2px,color:#f5eadc;
+  classDef matching fill:#203b36,stroke:#8af0bf,stroke-width:2px,color:#e8fff2;
+  classDef output fill:#3a2437,stroke:#ff8eb6,stroke-width:2px,color:#ffeaf2;
+  class CLI,WEB,MIC,FILE entry;
+  class VALIDATE,NORMALIZE,TEMPWAV,DIAG contract;
+  class DISPATCH,LOCAL,CONFIG,PROVIDERS,SHAZAM,ACOUSTID,AUDD matching;
+  class RESULT,MATCHED,NO_MATCH,NOT_CONFIGURED,INVALID,RATE_LIMITED,ERROR output;
