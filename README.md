@@ -369,3 +369,45 @@ Public `status` is one of: `matched` · `no_match` · `not_configured` · `inval
 ## License
 
 [MIT](LICENSE) — free to use and modify.
+
+
+## Source-reviewed architecture overview
+
+```mermaid
+%% Source-reviewed overview; 2026-10-03; commit 2671ccab1802f330083f122561e7ab6c2718dd9f
+%% Solid edges: core flow. Dashed edges: optional or separately invoked services.
+%%{init: {"theme":"base","securityLevel":"loose","fontFamily":"Arial, sans-serif","themeVariables":{"background":"#0b1220","primaryColor":"#17283d","primaryTextColor":"#edf4ff","primaryBorderColor":"#71c4ec","lineColor":"#9fadc1","secondaryColor":"#213548","tertiaryColor":"#17283d","edgeLabelBackground":"#0b1220","clusterBkg":"#101d2e","clusterBorder":"#456783","fontSize":"17px"},"flowchart":{"htmlLabels":true,"curve":"linear","nodeSpacing":35,"rankSpacing":50}}}%%
+flowchart TD
+  I["Microphone / file input"]
+  W["CLI + Flask entry points"]
+  N["Validate + normalize audio"]
+  D["Matcher + fallback dispatch"]
+  L["Local hashes + fingerprint index"]
+  P["Optional remote providers"]
+  F["CLI FFT diagnostic"]
+  R["Status / result presentation"]
+  ART["External album-art URLs"]
+  I --> W
+  R -. optional album art .-> ART
+  W --> N
+  N --> D
+  N -.->|CLI diagnostic before matching| F
+  D -->|configured index| L
+  D -.->|configured audio/fingerprint request| P
+  L --> R
+  P -.->|provider response| R
+  N -->|invalid audio status| R
+  click ART "https://github.com/icecold009/Audio-Recognition/blob/2671ccab1802f330083f122561e7ab6c2718dd9f/shazam_project/display.py" "Open source"
+  click I "https://github.com/icecold009/Audio-Recognition/blob/2671ccab1802f330083f122561e7ab6c2718dd9f/main.py" "Open source"
+  click W "https://github.com/icecold009/Audio-Recognition/blob/2671ccab1802f330083f122561e7ab6c2718dd9f/web/app.py" "Open source"
+  click N "https://github.com/icecold009/Audio-Recognition/blob/2671ccab1802f330083f122561e7ab6c2718dd9f/shazam_project/recorder.py" "Open source"
+  click D "https://github.com/icecold009/Audio-Recognition/blob/2671ccab1802f330083f122561e7ab6c2718dd9f/shazam_project/matcher.py" "Open source"
+  click L "https://github.com/icecold009/Audio-Recognition/blob/2671ccab1802f330083f122561e7ab6c2718dd9f/shazam_project/fingerprint.py" "Open source"
+  click P "https://github.com/icecold009/Audio-Recognition/blob/2671ccab1802f330083f122561e7ab6c2718dd9f/shazam_project/matcher.py" "Open source"
+  click F "https://github.com/icecold009/Audio-Recognition/blob/2671ccab1802f330083f122561e7ab6c2718dd9f/shazam_project/fft_analyze.py" "Open source"
+  click R "https://github.com/icecold009/Audio-Recognition/blob/2671ccab1802f330083f122561e7ab6c2718dd9f/web/static/app.js" "Open source"
+  classDef core fill:#17283d,stroke:#71c4ec,stroke-width:1.6px,color:#edf4ff;
+  class I,W,N,D,L,P,F,R,ART core;
+```
+
+See the [architecture case study](docs/architecture/README.md), [coverage](docs/architecture/coverage.md), and [publication evidence and rendered previews](docs/architecture/publication.md).
