@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-04",
+  "sourceSnapshot": "2671ccab1802f330083f122561e7ab6c2718dd9f",
+  "publicationParent": "b2ef7b1e7461a5fe56858e5773303632cbfc8bce",
+  "scope": "Actual documentation publication patch before this generated receipt; PNGs independently rendered and inspected",
+  "coveredTextFiles": [
+    "README.md",
+    "TODO.md",
+    "docs/architecture/README.md",
+    "docs/architecture/coverage.md",
+    "docs/architecture/detail.mmd",
+    "docs/architecture/overview.mmd",
+    "docs/architecture/publication.md",
+    "docs/architecture/verification.md",
+    "docs/architecture/verify.mjs"
+  ],
+  "excludedTextFiles": [],
+  "binaryPreviews": [
+    "overview.png",
+    "detail.png"
+  ],
+  "reviews": [
+    {
+      "model": "jev-1.13.0",
+      "gate": "resolve_findings_or_human_review",
+      "outcome": "no_clear_issue",
+      "confidence": 0.46,
+      "riskSignals": {
+        "correctness": 0.37,
+        "security": 0.13,
+        "regression": 0.09,
+        "test_gap": 0.47,
+        "context_gap": 0.52
+      },
+      "usage": {
+        "input_tokens": 16260,
+        "output_tokens": 499
+      }
+    }
+  ],
+  "approvalClaim": false,
+  "mainMergeAuthorized": false
+}

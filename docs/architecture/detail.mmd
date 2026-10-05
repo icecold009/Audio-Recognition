@@ -1,0 +1,34 @@
+flowchart TB
+  %% Solid arrows: runtime/data dependency; dotted arrows: optional, build or local-only boundary.
+  UI["CLI microphone/PCM and browser capture/upload"]
+  API["Flask validation, quotas and status/health routes"]
+  CONVERT["Bounded FFmpeg normalization and temp cleanup"]
+  DIAG["CLI FFT diagnostic before matching"]
+  FP["Local constellation fingerprints and index"]
+  MATCH["Dispatcher: RapidAPI, AcoustID, AudD, then local"]
+  CONFIG["Runtime configuration and provider policy"]
+  QUOTA["Atomic Supabase quota schema; in-memory mode"]
+  TOOLS["Fingerprint index construction and benchmarks"]
+  RUN["Gunicorn/container and deployment definitions"]
+  NORM["Shared validated AudioClip normalization"]
+  REMOTE["RapidAPI / AudD audio; AcoustID fingerprints"]
+  RESULT["Matched/no-match/not-configured/invalid/error results"]
+  SUPPORT["Supporting tests, assets, documentation and delivery config"]
+  ART["External album-art URLs"]
+  UI --> API
+  UI -. optional album art .-> ART
+  UI --> NORM
+  API --> CONVERT
+  CONVERT --> NORM
+  NORM --> MATCH
+  CONFIG --> API
+  CONFIG --> MATCH
+  API --> QUOTA
+  TOOLS --> FP
+  RUN -. configured entry .-> API
+  UI -. CLI diagnostic before matching .-> DIAG
+  MATCH -. local backend .-> FP
+  MATCH -. configured remotes .-> REMOTE
+  MATCH --> RESULT
+  RESULT --> UI
+  SUPPORT -. supports .-> UI
